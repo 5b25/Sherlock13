@@ -22,7 +22,7 @@ int tableCartes[4][8];
 int joueurCourant = 0;
 int crimeCard = -1;
 
-int nextAvailablePort = DEFAULT_PORT + 1; // 初始端口号
+int nextAvailablePort = DEFAULT_PORT + 1; // Initial port number
 
 const char *nomcartes[13] = {
     "Sebastian Moran", "irene Adler", "inspector Lestrade",
@@ -33,7 +33,7 @@ const char *nomcartes[13] = {
 const char *nameobjets[8] = {
     "Pipe","Ampoule","Poing","Insigne","Cahier","Collier","Oeil","Crâne"};
 
-// 线程参数结构体
+// Thread parameter structure
 struct thread_args {
     int sockfd;
     int server_port;
@@ -44,7 +44,7 @@ void melangerDeck() {
         deck[i] = i;
     }
     for (int i = 12; i > 0; i--) {
-        int j = arc4random_uniform(i + 1);  // 使用 arc4random
+        int j = arc4random_uniform(i + 1);  // Use arc4random
         int temp = deck[i];
         deck[i] = deck[j];
         deck[j] = temp;
@@ -52,14 +52,14 @@ void melangerDeck() {
 }
 
 void createTable() {
-    // 初始化所有玩家的符号计数为0
+    // Initialize all players' symbol counts to 0
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 8; j++) {
             tableCartes[i][j] = 0;
         }
     }
 
-    // 遍历每个玩家的3张卡牌，分配符号
+    // Iterate through each player's 3 cards, assigning symbols
     for (int player = 0; player < 4; player++) {
         int cards[3] = {deck[player*3], deck[player*3+1], deck[player*3+2]};
         for (int c = 0; c < 3; c++) {
@@ -167,13 +167,13 @@ void startGame() {
     sprintf(mmsg, "M %d", joueurCourant);
     broadcastMessage(mmsg);
 
-    // 广播每位玩家的对象信息，用于 GUI 表格显示
+    // Broadcasts each player's object information for GUI table display
     for (int pid = 0; pid < nbClients; pid++) {
         for (int oid = 0; oid < 8; oid++) {
             char tmsg[32];
             sprintf(tmsg, "T %d %d %d", pid, oid, tableCartes[pid][oid]);
             broadcastMessage(tmsg);
-            usleep(5000);  // 避免客户端处理过快
+            usleep(5000);  // Avoid client processing too quickly
         }
     }
 }
@@ -210,28 +210,28 @@ void processPlayerAction(char *buffer) {
             sprintf(emsg, "E %d WIN", id);
             broadcastMessage(emsg);
         } else {
-            // 广播出局信息
+            // Broadcast outgoing information
             char emsg[32];
             sprintf(emsg, "E %d LOSE", id);
             broadcastMessage(emsg);
     
-            // 标记出局
-            int playerAlive[4] = {1, 1, 1, 1}; // 1=活跃, 0=出局
+            // Mark player status
+            int playerAlive[4] = {1, 1, 1, 1}; // 1=active, 0=out
     
-            // 查找下一个未出局玩家
+            // Find the next remaining player
             int attempts = 0;
             do {
                 joueurCourant = (joueurCourant + 1) % nbClients;
                 attempts++;
             } while (!playerAlive[joueurCourant] && attempts < nbClients);
     
-            // 若还有未出局玩家，广播回合
+            // If there are still players present, broadcast the turn
             if (playerAlive[joueurCourant]) {
                 char mmsg[32];
                 sprintf(mmsg, "M %d", joueurCourant);
                 broadcastMessage(mmsg);
             } else {
-                // 所有玩家都出局了？逻辑结尾处理
+                // Special case handling: All players are out
                 broadcastMessage("E -1 DRAW");
             }
         }
@@ -253,7 +253,7 @@ void *handle_client(void *arg) {
     struct sockaddr_in addr;
     socklen_t addrlen = sizeof(addr);
 
-    // 获取对方地址
+    // Get player name
     getpeername(sockfd, (struct sockaddr *)&addr, &addrlen);
 
     int r = recv(sockfd, buffer, MAX_MSG - 1, 0);
@@ -263,22 +263,22 @@ void *handle_client(void *arg) {
         pthread_exit(NULL);
     }
 
-    buffer[r] = '\0'; // 添加字符串终止符
-    printf("客户端消息: %s\n", buffer);
+    buffer[r] = '\0'; // Add a string terminator
+    printf("Client message:%s\n", buffer);
 
     if (strncmp(buffer, "C ", 2) == 0) {
         char clientIP[40] = {0}, clientPortStr[10] = {0}, clientName[40] = {0};
         int num_fields = sscanf(buffer + 2, "%39s %9s %39s", clientIP, clientPortStr, clientName);
 
-        if (num_fields == 3) { // 自定义模式：C <IP> <端口> <姓名>
+        if (num_fields == 3) { // Custom Mode: C <IP> <Port> <Name>
             tcpClients[nbClients].port = atoi(clientPortStr);
             strcpy(tcpClients[nbClients].ipAddress, clientIP);
             strcpy(tcpClients[nbClients].name, clientName);
-        } else if (num_fields == 1) { // 默认模式：C <姓名>
+        } else if (num_fields == 1) { // Custom Mode: C <name>
             strcpy(clientName, buffer + 2);
-            // 分配新端口
+            // Assigning a new port
             tcpClients[nbClients].port = nextAvailablePort++;
-            // 从套接字获取真实IP
+            // Get real IP from socket
             strcpy(tcpClients[nbClients].ipAddress, inet_ntoa(addr.sin_addr));
             strcpy(tcpClients[nbClients].name, clientName);
         } else {
@@ -287,16 +287,16 @@ void *handle_client(void *arg) {
             return NULL;
         }
 
-        // 发送分配的端口和客户端ID（ "I" 消息）
+        // Send the assigned port and client ID ("I" message)
         char idmsg[64];
         snprintf(idmsg, sizeof(idmsg), "I %d %d", nbClients, tcpClients[nbClients].port);
         send(sockfd, idmsg, strlen(idmsg), 0);
 
-        // 记录客户端Socket并递增计数
+        // Record the client socket and increment the count
         clientSockets[nbClients] = sockfd;
         nbClients++;
 
-        // 广播玩家列表
+        // Broadcast Player List
         char listmsg[256] = "L";
         for (int i = 0; i < nbClients; i++) {
             strcat(listmsg, " ");
@@ -304,7 +304,7 @@ void *handle_client(void *arg) {
         }
         broadcastMessage(listmsg);
 
-        // 满4人开始游戏
+        // Start the game with 4 players
         if (nbClients == nbPlayers) startGame();
     } else {
         processPlayerAction(buffer);
@@ -357,7 +357,7 @@ void start_server_listener(int port) {
         exit(1);
     }
 
-    printf("主服务器监听中，端口 %d...\n", port);
+    printf("Server is listening on port %d...\n", port);
 
     while (1) {
         struct thread_args *args = malloc(sizeof(struct thread_args));

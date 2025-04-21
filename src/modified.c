@@ -1,239 +1,238 @@
-// client_logic.c
-#include "../include/client_logic.h"
+// gui.c — 融合增强版 + 联动资源系统
 #include "../include/gui.h"
+#include "../include/client_logic.h"
+#include "../include/resources.h"
+#include <SDL.h>
+#include <SDL_image.h>
+#include <SDL_ttf.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <pthread.h>
-#include <netdb.h>
 
-#define MAX_MSG 512
+#define WINDOW_WIDTH 1280
+#define WINDOW_HEIGHT 768
+#define ICON_SIZE 32
+#define CARD_WIDTH 140
+#define CARD_HEIGHT 200
+#define BUTTON_WIDTH 60
+#define BUTTON_HEIGHT 40
 
-pthread_mutex_t gameStateMutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t playerDataMutex = PTHREAD_MUTEX_INITIALIZER;
+typedef enum {
+    POPUP_NONE,
+    POPUP_O,
+    POPUP_S_SELECT_OBJ,
+    POPUP_S_SELECT_PLAYER,
+    POPUP_G
+} PopupState;
 
-enum {
-    GAME_NOT_CONNECTED = 0,
-    GAME_WAITING = 1,
-    GAME_STARTED = 2,
-    GAME_ENDED = 3
-};
+static int showEndDialog = 0;
+static PopupState popupState = POPUP_NONE;
 
-const char *nameobjets[8] = {
-    "Pipe", "Ampoule", "Poing", "Insigne",
-    "Cahier", "Collier", "Oeil", "Crâne"
-};
-
-char playerNames[4][32];
-int playerCount = 0;
-
-char serverIP[256] = "127.0.0.1";
-
-int socketClient = -1;
-char username[32] = "";
-char lastResult[128] = "";
-int myCards[3];
-int objectCounts[8];
-int gameState = 0;
-int isMyTurn = 0;
-int myClientId = -1;
-int gClientPort = 0;
-
-int objectTable[4][8] = {{0}};
-int playerAlive[4] = {1, 1, 1, 1};
-
-volatile int synchro = 0;
-
-void setUsername(const char *name) {
-    strncpy(username, name, sizeof(username));
+void render_text(SDL_Renderer *renderer, TTF_Font *font, const char *text, int x, int y, SDL_Color color) {
+    if (!text || strlen(text) == 0) return;
+    SDL_Surface *surf = TTF_RenderUTF8_Blended(font, text, color);
+    if (!surf) return;
+    SDL_Texture *tex = SDL_CreateTextureFromSurface(renderer, surf);
+    SDL_Rect rect = {x, y, surf->w, surf->h};
+    SDL_RenderCopy(renderer, tex, NULL, &rect);
+    SDL_FreeSurface(surf);
+    SDL_DestroyTexture(tex);
 }
 
-const char* getUsername() {
-    return username;
+void render_icon(SDL_Renderer *renderer, SDL_Texture *tex, int x, int y, int size) {
+    if (!tex) return;
+    SDL_Rect dst = {x, y, size, size};
+    SDL_RenderCopy(renderer, tex, NULL, &dst);
 }
 
-const char* getLastResult() {
-    static char safeResult[128];
-    pthread_mutex_lock(&gameStateMutex);
-    strncpy(safeResult, lastResult, sizeof(safeResult)-1);
-    pthread_mutex_unlock(&gameStateMutex);
-    return safeResult;
-}
-
-int* getMyCards() {
-    return myCards;
-}
-
-int* getObjectCounts() {
-    return objectCounts;
-}
-
-int isTurn() {
-    int turnStatus;
-    pthread_mutex_lock(&gameStateMutex);
-    turnStatus = isMyTurn;
-    pthread_mutex_unlock(&gameStateMutex);
-    return turnStatus;
-}
-
-int isGameEnded() {
-    return gameState == GAME_ENDED;
-}
-
-int getIsGameEnded() {
-    return gameState == GAME_ENDED;
-}
-
-const char* getPlayerName(int index) {
-    const char *name = "";
-    pthread_mutex_lock(&playerDataMutex);
-    if (index >= 0 && index < 4) {
-        name = playerNames[index];
-    }
-    pthread_mutex_unlock(&playerDataMutex);
-    return name;
-}
-
-int getPlayerCount() {
-    int count;
-    pthread_mutex_lock(&playerDataMutex);
-    count = playerCount;
-    pthread_mutex_unlock(&playerDataMutex);
-    return count;
-}
-
-int getIsGameStarted() {
-    int status;
-    pthread_mutex_lock(&gameStateMutex);
-    status = (gameState == GAME_STARTED);
-    pthread_mutex_unlock(&gameStateMutex);
-    return status;
-}
-
-int isUsernameSet() {
-    return username[0] != '\0';
-}
-
-int getClientPort() {
-    return gClientPort;
-}
-
-int getTableValue(int playerId, int objectId) {
-    if (playerId < 0 || playerId >= 4 || objectId < 0 || objectId >= 8)
-        return 0;
-    return objectTable[playerId][objectId];
-}
-
-int isPlayerAlive(int playerId) {
-    if (playerId < 0 || playerId >= 4) return 0;
-    return playerAlive[playerId];
-}
-
-void getLocalIP(char *ip, size_t len) {
-    char hostname[256];
-    struct hostent *host;
-
-    gethostname(hostname, sizeof(hostname));
-    host = gethostbyname(hostname);
-    if (host == NULL) {
-        strcpy(ip, "127.0.0.1");
-        return;
-    }
-    snprintf(ip, len, "%s", inet_ntoa(*(struct in_addr*)host->h_addr_list[0]));
-}
-
-void sendMessageToServer(char *ip, int port, char *mess) {
-    if (socketClient < 0) return;
-    send(socketClient, mess, strlen(mess), 0);
-}
-
-void* listenToServer(void *arg) {
-    char buffer[MAX_MSG];
-
-    while (1) {
-        memset(buffer, 0, MAX_MSG);
-        int r = recv(socketClient, buffer, MAX_MSG - 1, 0);
-        if (r <= 0) break;
-
-        buffer[r] = '\0';
-
-        if (strncmp(buffer, "U OK", 4) == 0) {
-            printf("用户名已接受，等待其他玩家...\n");
-        } else if (strncmp(buffer, "U ERR", 5) == 0) {
-            pthread_mutex_lock(&gameStateMutex);
-            strcpy(lastResult, "❌ 用户名重复，请更换！");
-            pthread_mutex_unlock(&gameStateMutex);
-        } else if (buffer[0] == 'D') {
-            sscanf(buffer + 2, "%d %d %d %d %d %d %d %d %d %d %d",
-                &myCards[0], &myCards[1], &myCards[2],
-                &objectCounts[0], &objectCounts[1], &objectCounts[2], &objectCounts[3],
-                &objectCounts[4], &objectCounts[5], &objectCounts[6], &objectCounts[7]);
-            pthread_mutex_lock(&gameStateMutex);
-            gameState = GAME_STARTED;
-            pthread_mutex_unlock(&gameStateMutex);
-        } else if (buffer[0] == 'M') {
-            int id;
-            sscanf(buffer + 2, "%d", &id);
-            pthread_mutex_lock(&gameStateMutex);
-            isMyTurn = (id == myClientId);
-            pthread_mutex_unlock(&gameStateMutex);
-        } else if (buffer[0] == 'V') {
-            strncpy(lastResult, buffer + 2, sizeof(lastResult) - 1);
-        } else if (buffer[0] == 'E') {
-            pthread_mutex_lock(&gameStateMutex);
-            gameState = GAME_ENDED;
-            strncpy(lastResult, buffer + 2, sizeof(lastResult) - 1);
-            pthread_mutex_unlock(&gameStateMutex);
-
-            if (strstr(buffer, "LOSE")) {
-                int id;
-                sscanf(buffer + 2, "%d", &id);
-                playerAlive[id] = 0;
-            }
-        } else if (buffer[0] == 'T') {
-            int pid, objid, val;
-            sscanf(buffer + 2, "%d %d %d", &pid, &objid, &val);
-            if (pid >= 0 && pid < 4 && objid >= 0 && objid < 8)
-                objectTable[pid][objid] = val;
-        } else if (buffer[0] == 'I') {
-            sscanf(buffer + 2, "%d", &myClientId);
-        } else if (buffer[0] == 'L') {
-            pthread_mutex_lock(&playerDataMutex);
-            playerCount = 0;
-            char *token = strtok(buffer + 2, " ");
-            while (token && playerCount < 4) {
-                strncpy(playerNames[playerCount], token, 31);
-                playerNames[playerCount][31] = '\0';
-                playerCount++;
-                token = strtok(NULL, " ");
-            }
-            pthread_mutex_unlock(&playerDataMutex);
+void render_cards(SDL_Renderer* renderer, SDL_Texture* cards[], int* mycards, int cardCount) {
+    for (int i = 0; i < cardCount; ++i) {
+        int idx = mycards[i];
+        if (idx >= 0 && idx < 13) {
+            SDL_Rect dst = {1020, 400 + i * 150, 100, 140};
+            SDL_RenderCopy(renderer, cards[idx], NULL, &dst);
         }
     }
-    return NULL;
 }
 
-void connectToServer(const char *ip, int port) {
-    struct sockaddr_in addr;
-    socketClient = socket(AF_INET, SOCK_STREAM, 0);
-    if (socketClient < 0) {
-        perror("socket");
-        exit(1);
+void draw_selection_popup(SDL_Renderer* renderer, TTF_Font* font) {
+    SDL_Rect popup = {180, 100, 440, 380};
+    SDL_SetRenderDrawColor(renderer, 250, 250, 250, 255);
+    SDL_RenderFillRect(renderer, &popup);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_RenderDrawRect(renderer, &popup);
+
+    SDL_Color black = {0, 0, 0};
+
+    render_text(renderer, font, "Objets:", 200, 120, black);
+    for (int i = 0; i < 8; ++i) {
+        char label[32];
+        snprintf(label, sizeof(label), "%d: OBJ%d", i + 1, i);
+        SDL_Rect box = {200, 160 + i * 25, 200, 22};
+        SDL_RenderDrawRect(renderer, &box);
+        render_text(renderer, font, label, 205, 162 + i * 25, black);
     }
 
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
-    addr.sin_addr.s_addr = inet_addr(ip);
+    render_text(renderer, font, "Joueurs:", 420, 120, black);
+    for (int i = 0; i < getPlayerCount(); ++i) {
+        char label[64];
+        snprintf(label, sizeof(label), "%d: %s", i + 1, getPlayerName(i));
+        SDL_Rect box = {420, 160 + i * 25, 180, 22};
+        SDL_RenderDrawRect(renderer, &box);
+        render_text(renderer, font, label, 425, 162 + i * 25, black);
+    }
+}
 
-    if (connect(socketClient, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-        perror("connect");
-        exit(1);
+void draw_guess_popup(SDL_Renderer* renderer, TTF_Font* font) {
+    SDL_Rect popup = {220, 180, 360, 240};
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_RenderFillRect(renderer, &popup);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_RenderDrawRect(renderer, &popup);
+
+    SDL_Color black = {0, 0, 0};
+    render_text(renderer, font, "Deviner le coupable:", 240, 200, black);
+    render_text(renderer, font, "← Cliquez sur un nom de carte →", 240, 240, black);
+}
+
+void show_end_popup(SDL_Renderer* renderer, TTF_Font* font, const char* result) {
+    if (!showEndDialog) return;
+    SDL_Rect popup = {180, 180, 420, 180};
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_RenderFillRect(renderer, &popup);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_RenderDrawRect(renderer, &popup);
+
+    SDL_Color red = {255, 0, 0};
+    SDL_Color green = {0, 160, 0};
+    SDL_Color black = {0, 0, 0};
+    render_text(renderer, font, "FIN DE PARTIE", 250, 200, red);
+    render_text(renderer, font, result, 250, 240, green);
+
+    SDL_Rect quitBtn = {300, 300, 100, 30};
+    SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
+    SDL_RenderFillRect(renderer, &quitBtn);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_RenderDrawRect(renderer, &quitBtn);
+    render_text(renderer, font, "QUITTER", 320, 305, black);
+}
+
+void setShowEndDialog(int value) {
+    showEndDialog = value;
+}
+
+void send_action_request(char type, int objet, int cible) {
+    char buffer[64];
+    if (type == 'O') {
+        snprintf(buffer, sizeof(buffer), "O %d", objet);
+    } else if (type == 'S') {
+        snprintf(buffer, sizeof(buffer), "S %d %d", objet, cible);
+    } else if (type == 'G') {
+        snprintf(buffer, sizeof(buffer), "G %d", objet);
+    }
+    sendMessageToServer("", 0, buffer);
+}
+
+void run_gui() {
+    SDL_Init(SDL_INIT_VIDEO);
+    IMG_Init(IMG_INIT_PNG);
+    TTF_Init();
+
+    SDL_Window *window = SDL_CreateWindow("Sherlock13", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+        WINDOW_WIDTH, WINDOW_HEIGHT, 0);
+    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    TTF_Font *font = TTF_OpenFont("img/sans.ttf", 20);
+
+    SDL_Color black = {0, 0, 0};
+    SDL_Color red = {255, 0, 0};
+    SDL_Color gray = {150, 150, 150};
+    SDL_Color green = {0, 160, 0};
+
+    load_all_textures(renderer);
+
+    char inputText[32] = "";
+    SDL_Rect inputBox = {400, 300, 400, 40};
+    SDL_Rect goButton = {550, 360, 100, 40};
+    SDL_StartTextInput();
+
+    int running = 1;
+    SDL_Event e;
+
+    while (running) {
+        while (SDL_PollEvent(&e)) {
+            if (e.type == SDL_QUIT) running = 0;
+            else if (e.type == SDL_TEXTINPUT && strlen(inputText) < 31) strcat(inputText, e.text.text);
+            else if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_BACKSPACE && strlen(inputText) > 0)
+                inputText[strlen(inputText) - 1] = '\0';
+            else if (e.type == SDL_MOUSEBUTTONDOWN) {
+                int x = e.button.x, y = e.button.y;
+
+                if (!getIsGameStarted() && x >= goButton.x && x <= goButton.x + goButton.w &&
+                    y >= goButton.y && y <= goButton.y + goButton.h && inputText[0] != '\0' && !isUsernameSet()) {
+                    setUsername(inputText);
+                    if (getClientPort() == 0) {
+                        char msg[128];
+                        snprintf(msg, sizeof(msg), "C %s", getUsername());
+                        sendMessageToServer("", 0, msg);
+                    }
+                }
+
+                if (getIsGameStarted() && isTurn()) {
+                    if (x >= 1150 && x <= 1220) {
+                        if (y >= 100 && y <= 140) popupState = POPUP_O;
+                        else if (y >= 150 && y <= 190) popupState = POPUP_S_SELECT_OBJ;
+                        else if (y >= 200 && y <= 240) popupState = POPUP_G;
+                    }
+                }
+
+                if (getIsGameEnded()) {
+                    if (x >= 300 && x <= 400 && y >= 300 && y <= 330) {
+                        running = 0;
+                    }
+                }
+            }
+        }
+
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        SDL_RenderClear(renderer);
+
+        if (!getIsGameStarted()) {
+            render_text(renderer, font, "Entrez votre nom:", 400, 250, black);
+            SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
+            SDL_RenderFillRect(renderer, &inputBox);
+            render_text(renderer, font, inputText, inputBox.x + 10, inputBox.y + 5, black);
+            SDL_SetRenderDrawColor(renderer, 100, 200, 100, 255);
+            SDL_RenderFillRect(renderer, &goButton);
+            render_text(renderer, font, "GO", goButton.x + 30, goButton.y + 5, black);
+
+            for (int i = 0; i < getPlayerCount(); ++i) {
+                char line[64];
+                snprintf(line, sizeof(line), "Joueur %d: %s", i + 1, getPlayerName(i));
+                render_text(renderer, font, line, 400, 460 + i * 30, black);
+            }
+        } else {
+            draw_game_board(renderer, font);
+            draw_role_table(renderer, font);
+
+            if (popupState == POPUP_O || popupState == POPUP_S_SELECT_OBJ || popupState == POPUP_S_SELECT_PLAYER) {
+                draw_selection_popup(renderer, font);
+            } else if (popupState == POPUP_G) {
+                draw_guess_popup(renderer, font);
+            }
+
+            if (getIsGameEnded()) {
+                show_end_popup(renderer, font, getLastResult());
+            }
+        }
+
+        SDL_RenderPresent(renderer);
     }
 
-    pthread_t tid;
-    pthread_create(&tid, NULL, listenToServer, NULL);
+    SDL_StopTextInput();
+    TTF_CloseFont(font);
+    unload_textures();
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    TTF_Quit();
+    IMG_Quit();
+    SDL_Quit();
 }

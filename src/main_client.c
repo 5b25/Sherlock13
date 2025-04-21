@@ -9,7 +9,7 @@ int main(int argc, char *argv[]) {
     const char *serverIP = "127.0.0.1";
     int serverPort = 32000;
 
-    // 模式一：./client <serverIP> <serverPort> <clientPort> <username>
+    // Mode 1:./client <serverIP> <serverPort> <clientPort> <username>
     if (argc == 5) {
         serverIP = argv[1];
         serverPort = atoi(argv[2]);
@@ -25,7 +25,7 @@ int main(int argc, char *argv[]) {
         sendMessageToServer("", 0, msg);
     }
 
-    // 模式二：./client <serverIP> <serverPort> <username>
+    // Mode 2:./client <serverIP> <serverPort> <username>
     else if (argc == 4) {
         serverIP = argv[1];
         serverPort = atoi(argv[2]);
@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
         connectToServer(serverIP, serverPort);
     }
 
-    // 模式三：./client <clientPort> <username>
+    // Mode 3:./client <clientPort> <username>
     else if (argc == 3) {
         gClientPort = atoi(argv[1]);
         setUsername(argv[2]);
@@ -49,15 +49,19 @@ int main(int argc, char *argv[]) {
         sendMessageToServer("", 0, msg);
     }
 
-    // 模式四：./client <username>
+    // Mode 4:./client <username>
     else if (argc == 2) {
         gClientPort = 0;
         setUsername(argv[1]);
 
         connectToServer(serverIP, serverPort);
+        
+        char msg[128];
+        snprintf(msg, sizeof(msg), "C %s", getUsername());
+        sendMessageToServer("", 0, msg);
     }
 
-    // 模式五：无参数 → GUI 输入
+    // Mode 5: No parameters → GUI input
     else {
         connectToServer(serverIP, serverPort);
     }

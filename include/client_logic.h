@@ -5,9 +5,9 @@
 #include <stddef.h>
 
 extern const char *nameobjets[8];
-extern int gClientPort;             // 客户端端口
-extern char username[32];           // 玩家姓名
-extern char serverIP[256];          // 服务器IP
+extern int gClientPort;             // Client port
+extern char username[32];           // User name
+extern char serverIP[256];          // Server IP
 
 void sendMessageToServer(char *ipAddress, int portno, char *mess);
 void setUsername(const char *name);
@@ -29,6 +29,8 @@ int getClientPort();
 int getTableValue(int playerId, int objectId);
 int isPlayerAlive(int playerId);
 int getCurrentPlayer();
+void updateCurrentTurn(int id);
+int getCurrentTurnPlayer();
 
 #endif
 

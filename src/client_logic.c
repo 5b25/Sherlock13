@@ -42,8 +42,9 @@ int gameState = 0;
 int isMyTurn = 0;
 int myClientId = -1;
 int gClientPort = 0;
+static int currentTurnPlayerId = -1;
 
-// 用于GUI显示的对象矩阵和玩家状态
+// Object matrices and player states for GUI display
 int objectTable[4][8] = {{0}};
 int playerAlive[4] = {1, 1, 1, 1};
 
@@ -114,10 +115,10 @@ void* listenToServer(void *arg) {
         buffer[r] = '\0';
 
         if (strncmp(buffer, "U OK", 4) == 0) {
-            printf("用户名已接受，等待其他玩家...\n");
+            printf("Username accepted, waiting for other players...\n");
         } else if (strncmp(buffer, "U ERR", 5) == 0) {
             pthread_mutex_lock(&gameStateMutex);
-            strcpy(lastResult, "❌ 用户名重复，请更换！");
+            strcpy(lastResult, "❌ The username is duplicated, please  rename it!");
             pthread_mutex_unlock(&gameStateMutex);
         } else if (buffer[0] == 'D') {
             sscanf(buffer + 2, "%d %d %d %d %d %d %d %d %d %d %d",
@@ -127,8 +128,8 @@ void* listenToServer(void *arg) {
             pthread_mutex_lock(&gameStateMutex);
             gameState = GAME_STARTED;
             pthread_mutex_unlock(&gameStateMutex);
-            printf("🎴 已接收到卡牌数据，游戏开始！\n");
-        } else if (buffer[0] == 'D' || buffer[0] == 'M' || buffer[0] == 'V') {
+            printf("🎴 Card data received, game on!\n");
+
             strncpy(lastResult, buffer + 2, sizeof(lastResult) - 1);
             lastResult[sizeof(lastResult) - 1] = '\0';
             printf("[Client] Message du serveur: %s\n", lastResult);
@@ -146,33 +147,43 @@ void* listenToServer(void *arg) {
             
             pthread_mutex_lock(&gameStateMutex);
             isMyTurn = (current == myClientId);
+            currentTurnPlayerId = current; 
             pthread_mutex_unlock(&gameStateMutex);
+
+            strncpy(lastResult, buffer + 2, sizeof(lastResult) - 1);
+            lastResult[sizeof(lastResult) - 1] = '\0';
+            printf("[Client] Message du serveur: %s\n", lastResult);
         } else if (buffer[0] == 'V') {
-            // 验证结果类型 | 目标玩家 | 符号ID
+
+            strncpy(lastResult, buffer + 2, sizeof(lastResult) - 1);
+            lastResult[sizeof(lastResult) - 1] = '\0';
+            printf("[Client] Message du serveur: %s\n", lastResult);
+
+            // Verification Result Type | Target Player | Symbol ID
             int resultVal, targetPlayer, symbol;
             if (sscanf(buffer + 2, "%d %d %d", &resultVal, &targetPlayer, &symbol) == 3) {
                 char msg[128];
                 const char *symbolName = nameobjets[symbol];
                 
                 if (targetPlayer == -1) {
-                    // 全体玩家验证（是否有符号）
-                    snprintf(msg, sizeof(msg), "全体玩家 %s 符号：%s",
-                            resultVal ? "有" : "没有", symbolName);
+                    // Verification by all players (whether there is a sign)
+                    snprintf(msg, sizeof(msg), "All players %s Symbol：%s",
+                            resultVal ? "has" : "doesn't have", symbolName);
                 } else {
-                    // 单个玩家验证（符号数量）
+                    // Single player verification (number of symbols)
                     const char *targetName = getPlayerName(targetPlayer);
-                    snprintf(msg, sizeof(msg), "玩家 %s 有 %d 个 %s",
+                    snprintf(msg, sizeof(msg), "player %s has %d 个 %s",
                             targetName, resultVal, symbolName);
                 }
                 
-                // 更新最后结果（加锁保护）
+                // Update the final result (lock protection)
                 pthread_mutex_lock(&gameStateMutex);
                 strncpy(lastResult, msg, sizeof(lastResult)-1);
                 pthread_mutex_unlock(&gameStateMutex);
                 
-                printf("[调试] 验证结果：%s\n", msg);
+                printf("[debug] Verification result:%s\n", msg);
             } else {
-                printf("[错误] 无效的V命令格式：%s\n", buffer);
+                printf("[Error] Invalid V command format:%s\n", buffer);
             }
         } else if (buffer[0] == 'L') {
             pthread_mutex_lock(&playerDataMutex);
@@ -187,7 +198,7 @@ void* listenToServer(void *arg) {
             pthread_mutex_unlock(&playerDataMutex);
 
             pthread_mutex_lock(&gameStateMutex);
-            snprintf(lastResult, sizeof(lastResult), "🎮 当前已加入的玩家列表：%s", buffer + 2);
+            snprintf(lastResult, sizeof(lastResult), "🎮 List of currently joined players：%s", buffer + 2);
             pthread_mutex_unlock(&gameStateMutex);
 
         } else if (buffer[0] == 'E') {
@@ -195,12 +206,11 @@ void* listenToServer(void *arg) {
             strcpy(lastResult, buffer);
             gameState = GAME_ENDED;
             pthread_mutex_unlock(&gameStateMutex);
-        } else if (buffer[0] == 'I') { // 处理端口分配
-            sscanf(buffer + 2, "%d", &myClientId); // 仅解析客户端ID
-            // 不再执行关闭和重新连接的代码
+        } else if (buffer[0] == 'I') { // Handling port allocation
+            sscanf(buffer + 2, "%d", &myClientId); // Parse only the client ID
             printf("Assigned client ID: %d\n", myClientId);
         } else if (buffer[0] == 'T') {
-            // 处理对象矩阵更新 T <player> <object> <value>
+            // Handling object matrix updates T <player> <object> <value>
             int pid, oid, val;
             if (sscanf(buffer + 2, "%d %d %d", &pid, &oid, &val) == 3) {
                 if (pid >= 0 && pid < 4 && oid >= 0 && oid < 8) {
@@ -209,7 +219,7 @@ void* listenToServer(void *arg) {
             }
 
         } else if (buffer[0] == 'E') {
-            // 处理游戏结束或玩家出局
+            // Handle game end or player elimination
             if (strstr(buffer, "LOSE")) {
                 int pid;
                 sscanf(buffer + 2, "%d", &pid);
@@ -225,7 +235,7 @@ void* listenToServer(void *arg) {
 void connectToServer(const char *ip, int port) {
     static int isFirstConnect = 1;
     if (isFirstConnect) {
-        strcpy(serverIP, ip); // 保存服务器IP
+        strcpy(serverIP, ip); // Save Server IP
         isFirstConnect = 0;
     }
 
@@ -245,7 +255,7 @@ void connectToServer(const char *ip, int port) {
         exit(1);
     }
 
-    printf("✅ 已连接服务器：%s:%d\n", ip, port);
+    printf("✅ Connected to server: %s:%d\n", ip, port);
 
     pthread_t tid;
     pthread_create(&tid, NULL, listenToServer, NULL);
@@ -305,4 +315,18 @@ int isPlayerAlive(int playerId) {
 
 int getCurrentPlayer() {
     return isTurn() ? myClientId : -1;
+}
+
+void updateCurrentTurn(int id) {
+    pthread_mutex_lock(&gameStateMutex);
+    currentTurnPlayerId = id;
+    pthread_mutex_unlock(&gameStateMutex);
+}
+
+int getCurrentTurnPlayer() {
+    int id;
+    pthread_mutex_lock(&gameStateMutex);
+    id = currentTurnPlayerId;
+    pthread_mutex_unlock(&gameStateMutex);
+    return id;
 }
