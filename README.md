@@ -68,11 +68,10 @@ Chaque joueur doit lancer un client. Plusieurs options sont possibles :
 
 | Mode | Commande | Description |
 |------|----------|-------------|
-| 1️⃣  | `./client 127.0.0.1 32000 Alice` | Connexion IP:port, nom = Alice |
-| 2️⃣  | `./client 127.0.0.1 Alice`       | Port par défaut 32000 |
-| 3️⃣  | `./client Alice`                 | IP par défaut 127.0.0.1 |
-| 4️⃣  | `./client gui 127.0.0.1 32000 Alice` | Lance l'interface graphique |
-| 5️⃣  | `./client`                       | Mode graphique par défaut, entrez un nom et cliquez sur GO |
+| 1️⃣  | `./client`                       | Mode graphique par défaut, entrez un nom et cliquez sur GO |
+| 2️⃣  | `./client Alice`                 | IP par défaut 127.0.0.1 |
+| 3️⃣  | `./client 127.0.0.1 Alice`       | Port est attribué automatiquement par le serveur, par défaut 32000 + nbClient |
+| 4️⃣  | `./client 127.0.0.1 32001 Alice` | Connexion IP:port, nom = Alice |
 
 > ⚠️ Le serveur doit être lancé avant que les clients ne se connectent.
 
@@ -89,9 +88,9 @@ Chaque joueur doit lancer un client. Plusieurs options sont possibles :
 ### 2. Interface graphique
 
 - **GO** : soumettre le nom et rejoindre le jeu
-- **O (🔍)** : demander si **n'importe qui** a un objet donné
-- **S (🎯)** : demander à un **joueur spécifique** s'il possède un objet
-- **G (💡)** : deviner le coupable (perdre en cas d'erreur)
+- **O** : demander si **n'importe qui** a un objet donné
+- **S** : demander à un **joueur spécifique** s'il possède un objet
+- **G** : deviner le coupable (perdre en cas d'erreur)
 - **Zone en haut à gauche** : icônes des objets + quantité
 - **Tableau à gauche** : noms des joueurs + objets associés
 - **Barre d'état** : joueur actuel et résultat de la dernière action
