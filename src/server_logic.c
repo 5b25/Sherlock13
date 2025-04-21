@@ -22,6 +22,9 @@ int tableCartes[4][8];
 int joueurCourant = 0;
 int crimeCard = -1;
 
+// Mark player status
+int playerAlive[4] = {1, 1, 1, 1}; // 1=active, 0=out
+
 int nextAvailablePort = DEFAULT_PORT + 1; // Initial port number
 
 const char *nomcartes[13] = {
@@ -146,6 +149,10 @@ void startGame() {
     createTable();
     crimeCard = deck[12];
 
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        playerAlive[i] = 1;
+    }
+
     for (int i = 0; i < nbClients; i++) {
         char msg[256];
         int c1 = deck[i * 3 + 0];
@@ -179,68 +186,92 @@ void startGame() {
 }
 
 void processPlayerAction(char *buffer) {
-    if (strncmp(buffer, "O", 1) == 0) {
-        int id, obj;
-        sscanf(buffer, "O %d %d", &id, &obj);
-        int found = 0;
-        for (int p = 0; p < nbClients; p++) {
-            if (tableCartes[p][obj] > 0) {
-                found = 1;
-                break;
+    if (strncmp(buffer, "O ", 2) == 0) {
+        int obj;
+        if (sscanf(buffer, "O %d", &obj) == 1) {
+            // 检查是否有存活玩家持有该物品
+            int found = 0;
+            for (int p = 0; p < nbClients; p++) {
+                if (playerAlive[p] && tableCartes[p][obj] > 0) {
+                    found = 1;
+                    break;
+                }
             }
+            // 广播结果 V found -1 obj
+            char vmsg[32];
+            snprintf(vmsg, sizeof(vmsg), "V %d -1 %d", found, obj);
+            broadcastMessage(vmsg);
+            
+            // 切换到下一存活玩家
+            advanceToNextPlayer();
         }
-        char vmsg[32];
-        sprintf(vmsg, "V %d -1 %d", found, obj);
-        broadcastMessage(vmsg);
-    } else if (strncmp(buffer, "S", 1) == 0) {
-        int id, cible, obj;
-        sscanf(buffer, "S %d %d %d", &id, &cible, &obj);
-        int c1 = deck[cible * 3 + 0];
-        int c2 = deck[cible * 3 + 1];
-        int c3 = deck[cible * 3 + 2];
-        int count = tableCartes[c1][obj] + tableCartes[c2][obj] + tableCartes[c3][obj];
-        char vmsg[32];
-        sprintf(vmsg, "V %d %d %d", count, cible, obj);
-        broadcastMessage(vmsg);
-    } else if (strncmp(buffer, "G", 1) == 0) {
-        int id, card;
-        sscanf(buffer, "G %d %d", &id, &card);
-        if (card == crimeCard) {
-            char emsg[32];
-            sprintf(emsg, "E %d WIN", id);
-            broadcastMessage(emsg);
-        } else {
-            // Broadcast outgoing information
-            char emsg[32];
-            sprintf(emsg, "E %d LOSE", id);
-            broadcastMessage(emsg);
+    } else if (strncmp(buffer, "S ", 2) == 0) {
+        int idJoueur, target_id, obj;
+        if (sscanf(buffer, "S %d %d %d", &idJoueur, &target_id, &obj) == 3) {
+            // 输入有效性检查
+            if (target_id < 0 || target_id >= nbClients || obj < 0 || obj >= 8) {
+                sendError(idJoueur, "INVALID_S_CMD");
+                return;
+            }
     
-            // Mark player status
-            int playerAlive[4] = {1, 1, 1, 1}; // 1=active, 0=out
+            // 检查目标玩家是否存活
+            if (!playerAlive[target_id]) {
+                sendError(idJoueur, "TARGET_DEAD");
+                return;
+            }
     
-            // Find the next remaining player
-            int attempts = 0;
-            do {
-                joueurCourant = (joueurCourant + 1) % nbClients;
-                attempts++;
-            } while (!playerAlive[joueurCourant] && attempts < nbClients);
+            // 统计符号数量并广播
+            int count = tableCartes[target_id][obj];
+            char vmsg[32];
+            snprintf(vmsg, sizeof(vmsg), "V %d %d %d", count, target_id, obj);
+            broadcastMessage(vmsg);
     
-            // If there are still players present, broadcast the turn
-            if (playerAlive[joueurCourant]) {
-                char mmsg[32];
-                sprintf(mmsg, "M %d", joueurCourant);
-                broadcastMessage(mmsg);
+            // 切换到下一玩家
+            advanceToNextPlayer();
+        }
+    } else if (strncmp(buffer, "G ", 2) == 0) {
+        int idJoueur, card;
+        if (sscanf(buffer, "G %d %d", &idJoueur, &card) == 2) {
+            if (card == crimeCard) {
+                char emsg[32];
+                sprintf(emsg, "E %d WIN", idJoueur);
+                broadcastMessage(emsg);
+                fsmServer = GAME_ENDED;
             } else {
-                // Special case handling: All players are out
-                broadcastMessage("E -1 DRAW");
+                char emsg[32];
+                sprintf(emsg, "E %d LOSE", idJoueur);
+                broadcastMessage(emsg);
+                playerAlive[idJoueur] = 0; // 标记为淘汰
+                advanceToNextPlayer(); // 切换到下一存活玩家
             }
         }
     }
+}
 
-    joueurCourant = (joueurCourant + 1) % nbClients;
-    char mmsg[32];
-    sprintf(mmsg, "M %d", joueurCourant);
-    broadcastMessage(mmsg);
+// 切换到下一个存活玩家
+void advanceToNextPlayer() {
+    int aliveCount = 0;
+    for (int i = 0; i < nbClients; i++) {
+        if (playerAlive[i]) aliveCount++;
+    }
+    if (aliveCount == 0) {
+        broadcastMessage("E -1 DRAW");
+        return;
+    }
+
+    int attempts = 0;
+    do {
+        joueurCourant = (joueurCourant + 1) % nbClients;
+        attempts++;
+    } while (attempts < nbClients && !playerAlive[joueurCourant]);
+
+    if (playerAlive[joueurCourant]) {
+        char mmsg[32];
+        sprintf(mmsg, "M %d", joueurCourant);
+        broadcastMessage(mmsg);
+    } else {
+        broadcastMessage("E -1 DRAW"); // 所有玩家淘汰
+    }
 }
 
 void *handle_client(void *arg) {
@@ -305,7 +336,13 @@ void *handle_client(void *arg) {
         broadcastMessage(listmsg);
 
         // Start the game with 4 players
-        if (nbClients == nbPlayers) startGame();
+        if (nbClients == nbPlayers) { 
+            startGame(); 
+        } else if (nbClients >= MAX_CLIENTS) {
+            fprintf(stderr, "Max clients reached. Rejecting connection.\n");
+            close(sockfd);
+            pthread_exit(NULL);
+        }
     } else {
         processPlayerAction(buffer);
     }
@@ -404,4 +441,11 @@ void broadcastMessage(char *mess) {
 int getNextAvailablePort() {
     static int basePort = 32001;
     return basePort++;
+}
+
+void sendError(int clientId, const char* errorType) {
+    if (clientId < 0 || clientId >= nbClients) return;
+    char errmsg[64];
+    snprintf(errmsg, sizeof(errmsg), "E %s", errorType);
+    send(clientSockets[clientId], errmsg, strlen(errmsg), 0);
 }

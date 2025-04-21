@@ -105,6 +105,7 @@ void draw_selection_popup(SDL_Renderer* renderer, TTF_Font* font) {
 
     SDL_Color black = {0, 0, 0};
 
+    // 显示对象选择（O与S共用）
     render_text(renderer, font, "Objets:", 200, 120, black);
     for (int i = 0; i < 8; ++i) {
         SDL_Rect box = {200, 160 + i * 25, 200, 22};
@@ -117,26 +118,29 @@ void draw_selection_popup(SDL_Renderer* renderer, TTF_Font* font) {
 
         char label[32];
         snprintf(label, sizeof(label), "%d: %s", i + 1, nameobjets[i]);
-        render_text(renderer, font, label, 205, 162 + i * 25, black);
+        render_text(renderer, font, label, 205, 155 + i * 25, black);
     }
 
-    render_text(renderer, font, "Joueurs:", 420, 120, black);
-    int pc = getPlayerCount();
-    for (int i = 0; i < pc; ++i) {
-        SDL_Rect box = {420, 160 + i * 25, 180, 22};
-        if (i == selectedPlayerId) {
-            SDL_SetRenderDrawColor(renderer, 200, 200, 0, 100);
-            SDL_RenderFillRect(renderer, &box);
+    // 仅当 S 操作需要显示玩家选择
+    if (popupState == POPUP_S_SELECT_OBJ || popupState == POPUP_S_SELECT_PLAYER) {
+        render_text(renderer, font, "Joueurs:", 420, 120, black);
+        int pc = getPlayerCount();
+        for (int i = 0; i < pc; ++i) {
+            SDL_Rect box = {420, 160 + i * 25, 180, 22};
+            if (i == selectedPlayerId) {
+                SDL_SetRenderDrawColor(renderer, 200, 200, 0, 100);
+                SDL_RenderFillRect(renderer, &box);
+            }
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+            SDL_RenderDrawRect(renderer, &box);
+
+            char label[32];
+            snprintf(label, sizeof(label), "%d: %s", i + 1, getPlayerName(i));
+            render_text(renderer, font, label, 425, 155 + i * 25, black);
         }
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-        SDL_RenderDrawRect(renderer, &box);
-
-        char label[32];
-        snprintf(label, sizeof(label), "%d: %s", i + 1, getPlayerName(i));
-        render_text(renderer, font, label, 425, 162 + i * 25, black);
     }
 
-    // 确认按钮
+    // 确认和取消按钮
     SDL_Rect confirm = {240, 380, 80, 30};
     SDL_Rect cancel  = {360, 380, 80, 30};
     SDL_SetRenderDrawColor(renderer, 200, 255, 200, 255);
@@ -249,11 +253,11 @@ void draw_selection_popup(SDL_Renderer* renderer, TTF_Font* font) {
 void send_action_request(char type, int objet, int cible) {
     char buffer[64];
     if (type == 'O') {
-        snprintf(buffer, sizeof(buffer), "O %d", objet);
+        snprintf(buffer, sizeof(buffer), "O %d", objet); // 格式：O obj
     } else if (type == 'S') {
-        snprintf(buffer, sizeof(buffer), "S %d %d", objet, cible);
+        snprintf(buffer, sizeof(buffer), "S %d %d", cible, objet); // 格式：S target_id obj
     } else if (type == 'G') {
-        snprintf(buffer, sizeof(buffer), "G %d", objet);
+        snprintf(buffer, sizeof(buffer), "G %d %d", myClientId, objet); // 格式：G myClientId card
     }
     sendMessageToServer("", 0, buffer);
 }

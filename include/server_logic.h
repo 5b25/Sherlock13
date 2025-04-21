@@ -12,14 +12,22 @@ extern int joueurCourant;
 extern int fsmServer;
 extern int nbPlayers;
 
+typedef enum {
+    GAME_NOT_STARTED,
+    GAME_STARTED,
+    GAME_ENDED
+} GameState;
+
+
 void melangerDeck();
 void createTable();
 void printDeck();
 void printClients();
-int findClientByName(char *name);
+void advanceToNextPlayer();
 void sendMessageToClient(char *clientip,int clientport,char *mess);
 void broadcastMessage(char *mess);
 int getNextAvailablePort();
 void start_server_listener(int port);
+void sendError(int clientId, const char* errorType);
 
 #endif

@@ -134,13 +134,22 @@ void* listenToServer(void *arg) {
             lastResult[sizeof(lastResult) - 1] = '\0';
             printf("[Client] Message du serveur: %s\n", lastResult);
         } else if (buffer[0] == 'E') {
-            strncpy(lastResult, buffer + 2, sizeof(lastResult) - 1);
-            lastResult[sizeof(lastResult) - 1] = '\0';
-            printf("[Client] Fin de jeu: %s\n", lastResult);
-            setShowEndDialog(1);
-            strncpy(lastResult, buffer + 2, sizeof(lastResult) - 1);
-            lastResult[sizeof(lastResult) - 1] = '\0';
-            printf("[Client] Message du serveur: %s\n", lastResult);
+            pthread_mutex_lock(&gameStateMutex);
+            strncpy(lastResult, buffer + 2, sizeof(lastResult)-1);
+            lastResult[sizeof(lastResult)-1] = '\0';
+        
+            if (strstr(buffer, "WIN")) {
+                gameState = GAME_ENDED;
+                setShowEndDialog(1);
+            } else if (strstr(buffer, "LOSE")) {
+                int pid;
+                if (sscanf(buffer + 2, "%d", &pid) == 1 && pid >= 0 && pid < 4) {
+                    playerAlive[pid] = 0;
+                }
+            } else if (strstr(buffer, "DRAW")) {
+                gameState = GAME_ENDED;
+            }
+            pthread_mutex_unlock(&gameStateMutex);
         } else if (buffer[0] == 'M') {
             int current;
             sscanf(buffer + 2, "%d", &current);
@@ -201,11 +210,6 @@ void* listenToServer(void *arg) {
             snprintf(lastResult, sizeof(lastResult), "🎮 List of currently joined players：%s", buffer + 2);
             pthread_mutex_unlock(&gameStateMutex);
 
-        } else if (buffer[0] == 'E') {
-            pthread_mutex_lock(&gameStateMutex);
-            strcpy(lastResult, buffer);
-            gameState = GAME_ENDED;
-            pthread_mutex_unlock(&gameStateMutex);
         } else if (buffer[0] == 'I') { // Handling port allocation
             sscanf(buffer + 2, "%d", &myClientId); // Parse only the client ID
             printf("Assigned client ID: %d\n", myClientId);
@@ -218,15 +222,6 @@ void* listenToServer(void *arg) {
                 }
             }
 
-        } else if (buffer[0] == 'E') {
-            // Handle game end or player elimination
-            if (strstr(buffer, "LOSE")) {
-                int pid;
-                sscanf(buffer + 2, "%d", &pid);
-                if (pid >= 0 && pid < 4) {
-                    playerAlive[pid] = 0;
-                }
-            }
         }
     }
     return NULL;

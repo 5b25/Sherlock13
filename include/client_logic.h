@@ -8,6 +8,7 @@ extern const char *nameobjets[8];
 extern int gClientPort;             // Client port
 extern char username[32];           // User name
 extern char serverIP[256];          // Server IP
+extern int myClientId; 
 
 void sendMessageToServer(char *ipAddress, int portno, char *mess);
 void setUsername(const char *name);
