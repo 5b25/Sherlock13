@@ -166,6 +166,16 @@ void startGame() {
     char mmsg[32];
     sprintf(mmsg, "M %d", joueurCourant);
     broadcastMessage(mmsg);
+
+    // 广播每位玩家的对象信息，用于 GUI 表格显示
+    for (int pid = 0; pid < nbClients; pid++) {
+        for (int oid = 0; oid < 8; oid++) {
+            char tmsg[32];
+            sprintf(tmsg, "T %d %d %d", pid, oid, tableCartes[pid][oid]);
+            broadcastMessage(tmsg);
+            usleep(5000);  // 避免客户端处理过快
+        }
+    }
 }
 
 void processPlayerAction(char *buffer) {
@@ -200,9 +210,30 @@ void processPlayerAction(char *buffer) {
             sprintf(emsg, "E %d WIN", id);
             broadcastMessage(emsg);
         } else {
+            // 广播出局信息
             char emsg[32];
             sprintf(emsg, "E %d LOSE", id);
             broadcastMessage(emsg);
+    
+            // 标记出局
+            int playerAlive[4] = {1, 1, 1, 1}; // 1=活跃, 0=出局
+    
+            // 查找下一个未出局玩家
+            int attempts = 0;
+            do {
+                joueurCourant = (joueurCourant + 1) % nbClients;
+                attempts++;
+            } while (!playerAlive[joueurCourant] && attempts < nbClients);
+    
+            // 若还有未出局玩家，广播回合
+            if (playerAlive[joueurCourant]) {
+                char mmsg[32];
+                sprintf(mmsg, "M %d", joueurCourant);
+                broadcastMessage(mmsg);
+            } else {
+                // 所有玩家都出局了？逻辑结尾处理
+                broadcastMessage("E -1 DRAW");
+            }
         }
     }
 

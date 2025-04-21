@@ -43,6 +43,10 @@ int isMyTurn = 0;
 int myClientId = -1;
 int gClientPort = 0;
 
+// 用于GUI显示的对象矩阵和玩家状态
+int objectTable[4][8] = {{0}};
+int playerAlive[4] = {1, 1, 1, 1};
+
 volatile int synchro = 0;
 
 void setUsername(const char *name) {
@@ -101,12 +105,13 @@ void sendMessageToServer(char *ip, int port, char *mess) {
 
 void* listenToServer(void *arg) {
     char buffer[MAX_MSG];
-    //static char serverIP[40]; // 保存初始连接的服务器IP
 
     while (1) {
         memset(buffer, 0, MAX_MSG);
         int r = recv(socketClient, buffer, MAX_MSG - 1, 0);
         if (r <= 0) break;
+
+        buffer[r] = '\0';
 
         if (strncmp(buffer, "U OK", 4) == 0) {
             printf("用户名已接受，等待其他玩家...\n");
@@ -194,6 +199,24 @@ void* listenToServer(void *arg) {
             sscanf(buffer + 2, "%d", &myClientId); // 仅解析客户端ID
             // 不再执行关闭和重新连接的代码
             printf("Assigned client ID: %d\n", myClientId);
+        } else if (buffer[0] == 'T') {
+            // 处理对象矩阵更新 T <player> <object> <value>
+            int pid, oid, val;
+            if (sscanf(buffer + 2, "%d %d %d", &pid, &oid, &val) == 3) {
+                if (pid >= 0 && pid < 4 && oid >= 0 && oid < 8) {
+                    objectTable[pid][oid] = val;
+                }
+            }
+
+        } else if (buffer[0] == 'E') {
+            // 处理游戏结束或玩家出局
+            if (strstr(buffer, "LOSE")) {
+                int pid;
+                sscanf(buffer + 2, "%d", &pid);
+                if (pid >= 0 && pid < 4) {
+                    playerAlive[pid] = 0;
+                }
+            }
         }
     }
     return NULL;
@@ -264,4 +287,22 @@ int isUsernameSet() {
 
 int getClientPort() {
     return gClientPort;
+}
+
+int getTableValue(int playerId, int objectId) {
+    if (playerId >= 0 && playerId < 4 && objectId >= 0 && objectId < 8) {
+        return objectTable[playerId][objectId];
+    }
+    return 0;
+}
+
+int isPlayerAlive(int playerId) {
+    if (playerId >= 0 && playerId < 4) {
+        return playerAlive[playerId];
+    }
+    return 0;
+}
+
+int getCurrentPlayer() {
+    return isTurn() ? myClientId : -1;
 }

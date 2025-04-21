@@ -26,6 +26,9 @@ void connectToServer(const char* ip, int port);
 void getLocalIP(char *ip, size_t len);
 int isUsernameSet();
 int getClientPort();
+int getTableValue(int playerId, int objectId);
+int isPlayerAlive(int playerId);
+int getCurrentPlayer();
 
 #endif
 
