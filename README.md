@@ -105,3 +105,6 @@ Chaque joueur doit lancer un client. Plusieurs options sont possibles :
 
 ---
 ![Interface du jeu](./Captures%20d’écran/Interface.png)
+![Interface du jeu](./Captures%20d’écran/Button%20O.png)
+![Interface du jeu](./Captures%20d’écran/Button%20S.png)
+![Interface du jeu](./Captures%20d’écran/Button%20G.png)
