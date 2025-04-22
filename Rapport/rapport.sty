@@ -1,0 +1,142 @@
+% rapport.sty
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{rapport}[2025/03/24 Rapport template]
+
+% 要求使用 XeLaTeX 或 LuaLaTeX 编译
+\RequirePackage{iftex}
+\ifXeTeX\else
+  \ifLuaTeX\else
+	\PackageError{rapport}{必须使用 XeLaTeX 或 LuaLaTeX 编译}{}
+  \fi
+\fi
+
+% 基础设置
+\RequirePackage{geometry}
+\geometry{a4paper, margin=2.5cm}
+
+% 字体设置 (Arial)
+\RequirePackage{fontspec}
+\setmainfont{Arial}
+
+% 法语支持
+\RequirePackage{polyglossia}
+\setdefaultlanguage{french}
+
+% 数学公式支持
+\RequirePackage{amsmath}
+\RequirePackage{amssymb}
+\RequirePackage{unicode-math}
+
+% 图片支持
+\RequirePackage{graphicx}
+\RequirePackage{float}
+
+% 页眉页脚设置
+\RequirePackage{fancyhdr}
+\RequirePackage{lastpage}
+
+% 支持 \title 形式的标题
+\newcommand{\thetitle}{} % 初始化标题变量
+\renewcommand{\title}[1]{
+  \renewcommand{\thetitle}{#1}
+  \renewcommand{\@title}{#1} % 关键修复：传递标题到文档类
+}
+
+% 自定义页眉内容
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Xiaochen YANG} % 左侧栏设置为姓名
+\fancyhead[C]{\thetitle}      % 中间栏设置为文档标题
+\fancyhead[R]{21419435}       % 右侧栏设置为学号
+\fancyfoot[C]{\thepage/\pageref{LastPage}}  % 页脚格式 1/x
+\renewcommand{\headrulewidth}{0.4pt}       % 页眉分割线
+\renewcommand{\footrulewidth}{0pt}         % 隐藏页脚分割线
+
+% 数学环境增强
+\DeclareMathOperator{\e}{e}
+
+% 法语特殊字符快捷命令
+\newcommand{\cad}{c.-à-d.\@\xspace}
+\newcommand{\Cad}{C.-à-d.\@\xspace}
+\newcommand{\og}{\guillemotleft\ }
+\newcommand{\fg}{\ \guillemotright}
+
+% 图片快捷命令
+\newcommand{\image}[4][scale=1.0]{%
+  \begin{figure}[H]
+    \centering
+    \includegraphics[#1]{#2}
+    \caption[#3]{#3\label{#4}}
+  \end{figure}
+}
+
+% 行间距
+\usepackage{setspace}
+\onehalfspacing
+
+% 使用示例
+%\image[scale=0.5]{images/courbe.pdf}{Mesure sur oscilloscope}{fig:oscillo}
+
+
+% ========== 新增公式编号及子公式支持 ==========
+% 公式环境：自动编号，居中显示
+\newenvironment{formule}[1][]
+  {\begin{equation}\if\relax\detokenize{#1}\relax\else\label{#1}\fi}
+  {\end{equation}}
+
+% 多行公式环境：支持子公式编号 (subequations)
+\newenvironment{formules}[1][]
+  {\begin{subequations}\if\relax\detokenize{#1}\relax\else\label{#1}\fi}
+  {\end{subequations}}
+
+% 对齐公式环境：支持多行对齐和编号
+
+% 使用示例
+% \begin{align}
+%    F &= ma \label{eq:newton} \\
+%    V &= IR
+%  \end{align}
+  
+
+% 无编号公式环境（用 equation*）
+\newenvironment{formuleunnumbered}
+  {\begin{equation*}}
+  {\end{equation*}}
+
+% Schema de la fonction
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18} % 建议设置兼容版本
+
+
+\usepackage{listings}
+\usepackage{xcolor}
+
+\newcommand{\stringlstset}{
+		\lstset{
+		% backgroundcolor = \color{yellow!10},    % 背景色：淡黄色
+		% backgroundcolor = \color{gray!10}, 			% 背景色：灰色
+		% backgroundcolor = \color{lightgray!20},    % 背景色：亮灰色
+		escapeinside=``,			% “逃逸”区域
+		aboveskip=7pt, 				%与代码环境上一行的垂直间距为7pt
+		belowskip=5pt, 				%与代码环境下一行的垂直间距为5pt
+		identifierstyle=\ttfamily,
+		basicstyle=\small, 	% 打字机字体+斜体
+		keywordstyle=\bf\ttfamily\small,	% C语言关键字风格
+		commentstyle=\itshape\small, % 注释的字体格式
+		% frame=single,				% 外框格设置
+		% commentstyle=\it\ttfamily\footnotesize, % 注释的字体格式
+		% commentstyle=\itshape\color{blue}\footnotesize, % 注释的字体格式
+		breakatwhitespace=false,	% sets if automatic breaks should only happen at whitespace
+		breaklines=true,			% 对过长的代码自动换行
+		keepspaces=true,			% keeps spaces in text, useful for keeping indentation of	code (possibly needs columns=flexible)
+		columns=fixed,				% 字距
+		showtabs=false, 			% show tabs within strings adding particular underscores
+		showspaces=false,			% show spaces everywhere adding particular underscores; it overrides 'showstringspaces'
+		showstringspaces=false,		% 不显示代码字符串中间的空格标记
+		mathescape=true,			% 启用数学环境输入
+		tabsize=4,					% 设置tab缩进距离
+		texcl=true,					% 激活或取消激活 LATEX 注释行。 如果激活，注释行分隔符将照常打印，但注释行文本（直到行尾）被读取为 LATEX 代码并以注释样式排版。 
+		}}
+\lstnewenvironment{texC}[1][]{\lstset{language=C, #1}\stringlstset}{}
+
+\endinput

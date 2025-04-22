@@ -176,12 +176,12 @@ void* listenToServer(void *arg) {
                 
                 if (targetPlayer == -1) {
                     // Verification by all players (whether there is a sign)
-                    snprintf(msg, sizeof(msg), "All players %s Symbol：%s",
+                    snprintf(msg, sizeof(msg), "All players %s Symbol : %s",
                             resultVal ? "has" : "doesn't have", symbolName);
                 } else {
                     // Single player verification (number of symbols)
                     const char *targetName = getPlayerName(targetPlayer);
-                    snprintf(msg, sizeof(msg), "player %s has %d 个 %s",
+                    snprintf(msg, sizeof(msg), "player %s has %d %s",
                             targetName, resultVal, symbolName);
                 }
                 

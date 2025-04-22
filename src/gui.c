@@ -23,6 +23,16 @@
 #define BUTTON_G_X 650 
 #define BUTTON_G_Y 220
 
+#define POPUP_WIDTH          1000
+#define POPUP_HEIGHT         560
+#define CARD_START_X         220
+#define CARD_START_Y         180
+#define BG_CARD_WIDTH        160
+#define BG_CARD_HEIGHT       100
+#define COLUMNS_PER_ROW      5
+#define COLUMN_SPACING       20
+#define ROW_SPACING          40
+
 static int showEndDialog = 0;     ///< 是否显示结束对话框标志
 static PopupState popupState = POPUP_NONE;  ///< 当前弹窗状态
 
@@ -35,6 +45,14 @@ static int selectedObjectId = -1;
 static int selectedPlayerId = -1;
 static int selectedGuessCard = -1;
 
+int okBtnX = 400, okBtnY = 580;    // OK 按钮坐标
+int cancelBtnX = 520, cancelBtnY = 580;  // Cancel 按钮坐标
+
+// 消息显示区域参数
+#define MESSAGE_BOX_HEIGHT    40     // 消息框高度
+#define MESSAGE_FONT_SIZE     18     // 字体大小
+#define MESSAGE_PADDING       10     // 内边距
+#define MESSAGE_MAX_LENGTH    256    // 最大消息长度
 /**
  * @brief 渲染文本到指定位置
  * 
@@ -161,7 +179,7 @@ void draw_selection_popup(SDL_Renderer* renderer, TTF_Font* font) {
   * @param font 字体对象
   */
  void draw_guess_popup(SDL_Renderer* renderer, TTF_Font* font) {
-    SDL_Rect popup = {180, 120, 900, 480};
+    SDL_Rect popup = {180, 100, POPUP_WIDTH, POPUP_HEIGHT};
     SDL_SetRenderDrawColor(renderer, 250, 250, 250, 255);
     SDL_RenderFillRect(renderer, &popup);
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
@@ -171,12 +189,12 @@ void draw_selection_popup(SDL_Renderer* renderer, TTF_Font* font) {
     render_text(renderer, font, "Cliquez sur la carte que vous soupçonnez être le coupable :", 200, 130, black);
 
     for (int i = 0; i < 13; ++i) {
-        int row = i / 7;
-        int col = i % 7;
-        int x = 200 + col * 120;
-        int y = 180 + row * 160;
+        int row = i / COLUMNS_PER_ROW;
+        int col = i % COLUMNS_PER_ROW;
+        int x = CARD_START_X + col * (BG_CARD_WIDTH + COLUMN_SPACING);
+        int y = CARD_START_Y + row * (BG_CARD_HEIGHT + ROW_SPACING);
 
-        SDL_Rect cardRect = {x, y, 100, 140};
+        SDL_Rect cardRect = {x, y, BG_CARD_WIDTH, BG_CARD_HEIGHT};
         if (i == selectedGuessCard) {
             SDL_SetRenderDrawColor(renderer, 255, 255, 0, 150);
             SDL_RenderFillRect(renderer, &cardRect);
@@ -187,8 +205,8 @@ void draw_selection_popup(SDL_Renderer* renderer, TTF_Font* font) {
     }
 
     // OK / Cancel buttons
-    SDL_Rect okBtn = {320, 440, 80, 30};
-    SDL_Rect cancelBtn = {440, 440, 80, 30};
+    SDL_Rect okBtn = {okBtnX, okBtnY, 80, 30};
+    SDL_Rect cancelBtn = {cancelBtnX, cancelBtnY, 80, 30};
     SDL_SetRenderDrawColor(renderer, 200, 255, 200, 255);
     SDL_RenderFillRect(renderer, &okBtn);
     SDL_RenderDrawRect(renderer, &okBtn);
@@ -255,7 +273,7 @@ void send_action_request(char type, int objet, int cible) {
     if (type == 'O') {
         snprintf(buffer, sizeof(buffer), "O %d", objet); // 格式：O obj
     } else if (type == 'S') {
-        snprintf(buffer, sizeof(buffer), "S %d %d", cible, objet); // 格式：S target_id obj
+        snprintf(buffer, sizeof(buffer), "S %d %d %d", myClientId, cible, objet); // 格式：S myClientId target_id obj
     } else if (type == 'G') {
         snprintf(buffer, sizeof(buffer), "G %d %d", myClientId, objet); // 格式：G myClientId card
     }
@@ -399,11 +417,11 @@ void run_gui() {
                 
                     // 角色卡牌点击选择
                     for (int i = 0; i < 13; ++i) {
-                        int row = i / 7;
-                        int col = i % 7;
-                        int cx = 200 + col * 120;
-                        int cy = 180 + row * 160;
-                        SDL_Rect cardRect = {cx, cy, 100, 140};
+                        int row = i / COLUMNS_PER_ROW;
+                        int col = i % COLUMNS_PER_ROW;
+                        int cx = CARD_START_X + col * (BG_CARD_WIDTH + COLUMN_SPACING);
+                        int cy = CARD_START_Y + row * (BG_CARD_HEIGHT + ROW_SPACING);
+                        SDL_Rect cardRect = {cx, cy, BG_CARD_WIDTH, BG_CARD_HEIGHT};
                 
                         if (x >= cardRect.x && x <= cardRect.x + cardRect.w && y >= cardRect.y && y <= cardRect.y + cardRect.h) {
                             selectedGuessCard = i;
@@ -411,8 +429,8 @@ void run_gui() {
                     }
                 
                     // OK / Cancel
-                    SDL_Rect okBtn = {320, 440, 80, 30};
-                    SDL_Rect cancelBtn = {440, 440, 80, 30};
+                    SDL_Rect okBtn = {okBtnX, okBtnY, 80, 30};
+                    SDL_Rect cancelBtn = {cancelBtnX, cancelBtnY, 80, 30};
                     if (x >= okBtn.x && x <= okBtn.x + okBtn.w && y >= okBtn.y && y <= okBtn.y + okBtn.h && selectedGuessCard >= 0) {
                         send_action_request('G', selectedGuessCard, 0);
                         popupState = POPUP_NONE;
@@ -563,7 +581,9 @@ void draw_game_board(SDL_Renderer* renderer, TTF_Font* font) {
     render_osg_buttons(renderer, font);
  
     // 底部显示
-    render_text(renderer, font, getLastResult(), WINDOW_WIDTH / 2 - 200, WINDOW_HEIGHT - 60, red);
+    char currentUserid[30];
+    snprintf(currentUserid, sizeof(currentUserid), "Current ID: %s", getLastResult());
+    render_text(renderer, font, currentUserid, WINDOW_WIDTH / 2 - 200, WINDOW_HEIGHT - 60, red);
     // 在底部显示当前玩家姓名
     if (getIsGameStarted()) {
         SDL_Color turnColor = {255, 0, 0}; // 红色高亮当前玩家
