@@ -8,14 +8,14 @@
 #include <stdio.h>
 #include <string.h>
 
-// 窗口尺寸常量
-#define WINDOW_WIDTH 1280    ///< 窗口宽度
-#define WINDOW_HEIGHT 768    ///< 窗口高度
-#define ICON_SIZE 32         ///< 图标尺寸
-#define CARD_WIDTH 300       ///< 卡牌宽度
-#define CARD_HEIGHT 200      ///< 卡牌高度
-#define BUTTON_WIDTH 130     ///< 按钮宽度
-#define BUTTON_HEIGHT 40     ///< 按钮高度
+// Window dimension constants
+#define WINDOW_WIDTH 1280    ///< Window width
+#define WINDOW_HEIGHT 768    ///< Window height
+#define ICON_SIZE 32         ///< Icon size
+#define CARD_WIDTH 300       ///< Card width
+#define CARD_HEIGHT 200      ///< Card height
+#define BUTTON_WIDTH 130     ///< Button width
+#define BUTTON_HEIGHT 40     ///< Button height
 #define BUTTON_O_X 650
 #define BUTTON_O_Y 100
 #define BUTTON_S_X 650
@@ -33,35 +33,36 @@
 #define COLUMN_SPACING       20
 #define ROW_SPACING          40
 
-static int showEndDialog = 0;     ///< 是否显示结束对话框标志
-static PopupState popupState = POPUP_NONE;  ///< 当前弹窗状态
+static int showEndDialog = 0;     ///< Flag for showing end dialog
+static PopupState popupState = POPUP_NONE;  ///< Current popup state
 
 // Tracking Mouse State
 static int mouseX = 0, mouseY = 0;
 static int hoverO = 0, hoverS = 0, hoverG = 0;
 
-// 记录选择弹窗中的对象与玩家
+// Record selected object and player in popup
 static int selectedObjectId = -1;
 static int selectedPlayerId = -1;
 static int selectedGuessCard = -1;
 
-int okBtnX = 400, okBtnY = 580;    // OK 按钮坐标
-int cancelBtnX = 520, cancelBtnY = 580;  // Cancel 按钮坐标
+int okBtnX = 400, okBtnY = 580;    // OK button coordinates
+int cancelBtnX = 520, cancelBtnY = 580;  // Cancel button coordinates
 
-// 消息显示区域参数
-#define MESSAGE_BOX_HEIGHT    40     // 消息框高度
-#define MESSAGE_FONT_SIZE     18     // 字体大小
-#define MESSAGE_PADDING       10     // 内边距
-#define MESSAGE_MAX_LENGTH    256    // 最大消息长度
+// Message display area parameters
+#define MESSAGE_BOX_HEIGHT    40     // Message box height
+#define MESSAGE_FONT_SIZE     18     // Font size
+#define MESSAGE_PADDING       10     // Padding
+#define MESSAGE_MAX_LENGTH    256    // Max message length
+
 /**
- * @brief 渲染文本到指定位置
+ * @brief Render text at specified position
  * 
- * @param renderer SDL渲染器
- * @param font 字体对象
- * @param text 要渲染的文本
- * @param x 文本左上角x坐标
- * @param y 文本左上角y坐标
- * @param color 文本颜色
+ * @param renderer SDL renderer
+ * @param font Font object
+ * @param text Text to render
+ * @param x Top-left x coordinate
+ * @param y Top-left y coordinate
+ * @param color Text color
  */
 void render_text(SDL_Renderer *renderer, TTF_Font *font, const char *text, int x, int y, SDL_Color color) {
     if (!text || strlen(text) == 0) return;
@@ -75,13 +76,13 @@ void render_text(SDL_Renderer *renderer, TTF_Font *font, const char *text, int x
 }
 
 /**
- * @brief 渲染图标到指定位置
+ * @brief Render icon at specified position
  * 
- * @param renderer SDL渲染器
- * @param tex 图标纹理
- * @param x 图标左上角x坐标
- * @param y 图标左上角y坐标
- * @param size 图标尺寸
+ * @param renderer SDL renderer
+ * @param tex Icon texture
+ * @param x Top-left x coordinate
+ * @param y Top-left y coordinate
+ * @param size Icon size
  */
 void render_icon(SDL_Renderer *renderer, SDL_Texture *tex, int x, int y, int size) {
     if (!tex) return;
@@ -90,12 +91,12 @@ void render_icon(SDL_Renderer *renderer, SDL_Texture *tex, int x, int y, int siz
 }
  
 /**
- * @brief 渲染玩家持有的卡牌
+ * @brief Render player's cards
  * 
- * @param renderer SDL渲染器
- * @param cards 卡牌纹理数组
- * @param mycards 玩家持有的卡牌索引数组
- * @param cardCount 卡牌数量
+ * @param renderer SDL renderer
+ * @param cards Array of card textures
+ * @param mycards Array of player's card indices
+ * @param cardCount Number of cards
  */
 void render_cards(SDL_Renderer* renderer, SDL_Texture* cards[], int* mycards, int cardCount) {
     for (int i = 0; i < cardCount; ++i) {
@@ -108,13 +109,13 @@ void render_cards(SDL_Renderer* renderer, SDL_Texture* cards[], int* mycards, in
 }
  
 /**
- * @brief 绘制选择弹窗(用于观察/推测操作)
+ * @brief Draw selection popup (for Observe/Speculate actions)
  * 
- * @param renderer SDL渲染器
- * @param font 字体对象
+ * @param renderer SDL renderer
+ * @param font Font object
  */
 void draw_selection_popup(SDL_Renderer* renderer, TTF_Font* font) {
-    // 绘制弹窗背景
+    // Draw popup background
     SDL_Rect popup = {180, 100, 440, 380};
     SDL_SetRenderDrawColor(renderer, 250, 250, 250, 255);
     SDL_RenderFillRect(renderer, &popup);
@@ -123,7 +124,7 @@ void draw_selection_popup(SDL_Renderer* renderer, TTF_Font* font) {
 
     SDL_Color black = {0, 0, 0};
 
-    // 显示对象选择（O与S共用）
+    // Show object selection (shared by O and S)
     render_text(renderer, font, "Objets:", 200, 120, black);
     for (int i = 0; i < 8; ++i) {
         SDL_Rect box = {200, 160 + i * 25, 200, 22};
@@ -139,7 +140,7 @@ void draw_selection_popup(SDL_Renderer* renderer, TTF_Font* font) {
         render_text(renderer, font, label, 205, 155 + i * 25, black);
     }
 
-    // 仅当 S 操作需要显示玩家选择
+    // Only show player selection for S action
     if (popupState == POPUP_S_SELECT_OBJ || popupState == POPUP_S_SELECT_PLAYER) {
         render_text(renderer, font, "Joueurs:", 420, 120, black);
         int pc = getPlayerCount();
@@ -158,7 +159,7 @@ void draw_selection_popup(SDL_Renderer* renderer, TTF_Font* font) {
         }
     }
 
-    // 确认和取消按钮
+    // OK / Cancel buttons
     SDL_Rect confirm = {240, 380, 80, 30};
     SDL_Rect cancel  = {360, 380, 80, 30};
     SDL_SetRenderDrawColor(renderer, 200, 255, 200, 255);
@@ -173,10 +174,10 @@ void draw_selection_popup(SDL_Renderer* renderer, TTF_Font* font) {
 }
  
  /**
-  * @brief 绘制猜测弹窗
+  * @brief Draw guess popup
   * 
-  * @param renderer SDL渲染器
-  * @param font 字体对象
+  * @param renderer SDL renderer
+  * @param font Font object
   */
  void draw_guess_popup(SDL_Renderer* renderer, TTF_Font* font) {
     SDL_Rect popup = {180, 100, POPUP_WIDTH, POPUP_HEIGHT};
@@ -219,16 +220,16 @@ void draw_selection_popup(SDL_Renderer* renderer, TTF_Font* font) {
 }
  
  /**
-  * @brief 显示游戏结束弹窗
+  * @brief Show end game popup
   * 
-  * @param renderer SDL渲染器
-  * @param font 字体对象
-  * @param result 游戏结果文本
+  * @param renderer SDL renderer
+  * @param font Font object
+  * @param result Game result text
   */
  void show_end_popup(SDL_Renderer* renderer, TTF_Font* font, const char* result) {
      if (!showEndDialog) return;
      
-     // 绘制弹窗背景
+     // Draw popup background
      SDL_Rect popup = {180, 180, 420, 180};
      SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
      SDL_RenderFillRect(renderer, &popup);
@@ -239,11 +240,11 @@ void draw_selection_popup(SDL_Renderer* renderer, TTF_Font* font) {
      SDL_Color green = {0, 160, 0};
      SDL_Color black = {0, 0, 0};
      
-     // 绘制标题和结果
-     render_text(renderer, font, "FIN DE PARTIE", 250, 200, red);
+     // Draw title and result
+     render_text(renderer, font, "GAME OVER", 250, 200, red);
      render_text(renderer, font, result, 250, 240, green);
  
-     // 绘制退出按钮
+     // Draw quit button
      SDL_Rect quitBtn = {300, 300, 100, 30};
      SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
      SDL_RenderFillRect(renderer, &quitBtn);
@@ -253,45 +254,45 @@ void draw_selection_popup(SDL_Renderer* renderer, TTF_Font* font) {
  }
  
  /**
-  * @brief 设置是否显示结束对话框
+  * @brief Set whether to show end dialog
   * 
-  * @param value 1显示/0隐藏
+  * @param value 1=show/0=hide
   */
  void setShowEndDialog(int value) {
      showEndDialog = value;
  }
  
 /**
- * @brief 发送动作请求到服务器
+ * @brief Send action request to server
  * 
- * @param type 动作类型(O/S/G)
- * @param objet 对象ID
- * @param cible 目标ID(仅S动作需要)
+ * @param type Action type (O/S/G)
+ * @param objet Object ID
+ * @param cible Target ID (only needed for S action)
  */
 void send_action_request(char type, int objet, int cible) {
     char buffer[64];
     if (type == 'O') {
-        snprintf(buffer, sizeof(buffer), "O %d", objet); // 格式：O obj
+        snprintf(buffer, sizeof(buffer), "O %d", objet); // Format: O obj
     } else if (type == 'S') {
-        snprintf(buffer, sizeof(buffer), "S %d %d %d", myClientId, cible, objet); // 格式：S myClientId target_id obj
+        snprintf(buffer, sizeof(buffer), "S %d %d %d", myClientId, cible, objet); // Format: S myClientId target_id obj
     } else if (type == 'G') {
-        snprintf(buffer, sizeof(buffer), "G %d %d", myClientId, objet); // 格式：G myClientId card
+        snprintf(buffer, sizeof(buffer), "G %d %d", myClientId, objet); // Format: G myClientId card
     }
     sendMessageToServer("", 0, buffer);
 }
  
 /**
- * @brief 主GUI循环
+ * @brief Main GUI loop
  * 
- * 初始化SDL窗口和渲染器，处理用户输入，渲染游戏界面
+ * Initialize SDL window and renderer, handle user input, render game interface
  */
 void run_gui() {
-    // 初始化SDL子系统
+    // Initialize SDL subsystems
     SDL_Init(SDL_INIT_VIDEO);
     IMG_Init(IMG_INIT_PNG);
     TTF_Init();
  
-    // 创建窗口和渲染器
+    // Create window and renderer
     SDL_Window *window = SDL_CreateWindow("Sherlock13", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         WINDOW_WIDTH, WINDOW_HEIGHT, 0);
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
@@ -299,50 +300,50 @@ void run_gui() {
  
     SDL_Color black = {0, 0, 0};
      
-    // 加载所有纹理资源
+    // Load all texture resources
     load_all_textures(renderer);
  
-    // 用户名输入框相关变量
+    // Username input box variables
     char inputText[32] = "";
     SDL_Rect inputBox = {400, 300, 400, 40};
     SDL_Rect goButton = {550, 360, 140, 40};
     SDL_StartTextInput();
  
-    // 主循环控制变量
+    // Main loop control variable
     int running = 1;
     SDL_Event e;
  
-    // 主事件循环
+    // Main event loop
     while (running) {
-        // 处理所有待处理事件
+        // Process all pending events
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_QUIT) {
                 running = 0;
             }
-            // 处理文本输入
+            // Handle text input
             else if (e.type == SDL_TEXTINPUT && strlen(inputText) < 31) {
                 strcat(inputText, e.text.text);
             }
-            // 处理键盘按键
+            // Handle keyboard presses
             else if (e.type == SDL_KEYDOWN) {
                 if (e.key.keysym.sym == SDLK_ESCAPE) {
                     if (popupState != POPUP_NONE) {
-                        // 按 ESC 关闭弹窗
+                        // Press ESC to close popup
                         popupState = POPUP_NONE;
                         selectedObjectId = -1;
                         selectedPlayerId = -1;
                         selectedGuessCard = -1;
                     }
                 } else if (e.key.keysym.sym == SDLK_BACKSPACE && strlen(inputText) > 0) {
-                    // 删除输入文本
+                    // Delete input text
                     inputText[strlen(inputText) - 1] = '\0';
                 }
             }
-            // 处理鼠标点击
+            // Handle mouse clicks
             else if (e.type == SDL_MOUSEBUTTONDOWN) {
                 int x = e.button.x, y = e.button.y;
 
-                // 游戏未开始时处理用户名输入
+                // Handle username input when game not started
                 if (!getIsGameStarted() && x >= goButton.x && x <= goButton.x + goButton.w &&
                    y >= goButton.y && y <= goButton.y + goButton.h && inputText[0] != '\0' && !isUsernameSet()) {
                    setUsername(inputText);
@@ -353,7 +354,7 @@ void run_gui() {
                     }
                 }
  
-                // 游戏进行中且是当前玩家回合时处理操作按钮
+                // Handle action buttons when game is in progress and it's current player's turn
                 if (getIsGameStarted() && isTurn()) {
                     if (hoverO) {
                         popupState = POPUP_O;
@@ -372,7 +373,7 @@ void run_gui() {
                 if (popupState == POPUP_S_SELECT_OBJ || popupState == POPUP_S_SELECT_PLAYER || popupState == POPUP_O) {
                     int x = e.button.x, y = e.button.y;
                 
-                    // 选中对象
+                    // Select object
                     for (int i = 0; i < 8; ++i) {
                         SDL_Rect objBox = {200, 160 + i * 25, 200, 22};
                         if (x >= objBox.x && x <= objBox.x + objBox.w && y >= objBox.y && y <= objBox.y + objBox.h) {
@@ -380,7 +381,7 @@ void run_gui() {
                         }
                     }
                 
-                    // 选中玩家（用于 S 操作）
+                    // Select player (for S action)
                     int pc = getPlayerCount();
                     for (int i = 0; i < pc; ++i) {
                         SDL_Rect playerBox = {420, 160 + i * 25, 180, 22};
@@ -394,13 +395,13 @@ void run_gui() {
                     SDL_Rect cancelBtn = {360, 380, 80, 30};
                 
                     if (x >= okBtn.x && x <= okBtn.x + okBtn.w && y >= okBtn.y && y <= okBtn.y + okBtn.h) {
-                        // 根据操作类型发送请求
+                        // Send request based on action type
                         if (popupState == POPUP_O && selectedObjectId >= 0) {
                             send_action_request('O', selectedObjectId, 0);
                         } else if (popupState == POPUP_S_SELECT_OBJ && selectedObjectId >= 0 && selectedPlayerId >= 0) {
                             send_action_request('S', selectedObjectId, selectedPlayerId);
                         }
-                        // 重置状态
+                        // Reset state
                         popupState = POPUP_NONE;
                         selectedObjectId = -1;
                         selectedPlayerId = -1;
@@ -415,7 +416,7 @@ void run_gui() {
                 if (popupState == POPUP_G) {
                     int x = e.button.x, y = e.button.y;
                 
-                    // 角色卡牌点击选择
+                    // Character card selection
                     for (int i = 0; i < 13; ++i) {
                         int row = i / COLUMNS_PER_ROW;
                         int col = i % COLUMNS_PER_ROW;
@@ -443,19 +444,19 @@ void run_gui() {
                     }
                 }
                 
-                // 游戏结束时处理退出按钮
+                // Handle quit button when game ends
                 if (getIsGameEnded()) {
                     if (x >= 300 && x <= 400 && y >= 300 && y <= 330) {
                         running = 0;
                     }
                 }
             }
-            // 处理鼠标移动事件
+            // Handle mouse motion events
             else if (e.type == SDL_MOUSEMOTION) {
                 mouseX = e.motion.x;
                 mouseY = e.motion.y;
                 
-                // 更新悬停状态
+                // Update hover state
                 hoverO = (mouseX >= BUTTON_O_X && mouseX <= BUTTON_O_X + BUTTON_WIDTH &&
                          mouseY >= BUTTON_O_Y && mouseY <= BUTTON_O_Y + BUTTON_HEIGHT);
                 hoverS = (mouseX >= BUTTON_S_X && mouseX <= BUTTON_S_X + BUTTON_WIDTH &&
@@ -465,13 +466,13 @@ void run_gui() {
             }
         }
 
-        // 清屏
+        // Clear screen
         SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
         SDL_RenderClear(renderer);
 
-        // 根据游戏状态渲染不同界面
+        // Render different interfaces based on game state
         if (!getIsGameStarted()) {
-            // 渲染用户名输入界面
+            // Render username input interface
             render_text(renderer, font, "Entrez votre nom:", 400, 250, black);
             SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
             SDL_RenderFillRect(renderer, &inputBox);
@@ -480,35 +481,35 @@ void run_gui() {
             SDL_RenderFillRect(renderer, &goButton);
             render_text(renderer, font, "Connect", goButton.x + 33, goButton.y + 5, black);
 
-            // 显示已连接玩家列表
+            // Show list of connected players
             for (int i = 0; i < getPlayerCount(); ++i) {
                 char line[64];
                 snprintf(line, sizeof(line), "Joueur %d: %s", i + 1, getPlayerName(i));
                 render_text(renderer, font, line, 400, 460 + i * 30, black);
             }
         } else {
-            // 游戏进行中，渲染游戏主界面
+            // Game in progress, render main game interface
             draw_game_board(renderer, font);
             draw_role_table(renderer, font);
 
-            // 根据弹窗状态渲染不同弹窗
+            // Render different popups based on state
             if (popupState == POPUP_O || popupState == POPUP_S_SELECT_OBJ || popupState == POPUP_S_SELECT_PLAYER) {
                 draw_selection_popup(renderer, font);
             } else if (popupState == POPUP_G) {
                 draw_guess_popup(renderer, font);
             }
 
-            // 游戏结束时显示结束弹窗
+            // Show end popup when game ends
             if (getIsGameEnded()) {
                 show_end_popup(renderer, font, getLastResult());
             }
         }
 
-        // 更新屏幕
+        // Update screen
         SDL_RenderPresent(renderer);
     }
 
-    // 清理资源
+    // Clean up resources
     SDL_StopTextInput();
     TTF_CloseFont(font);
     unload_textures();
@@ -520,23 +521,23 @@ void run_gui() {
 }
  
 /**
- * @brief 绘制游戏主面板
+ * @brief Draw main game board
  * 
- * @param renderer SDL渲染器
- * @param font 字体对象
+ * @param renderer SDL renderer
+ * @param font Font object
  */
 void draw_game_board(SDL_Renderer* renderer, TTF_Font* font) {
     SDL_Color black = {0, 0, 0};
     SDL_Color red = {255, 0, 0};
     SDL_Color gray = {150, 150, 150};
 
-    // 布局参数
+    // Layout parameters
     int marginLeft = 100, marginTop = 70;
     int cellSize = 35;
     int playerCount = getPlayerCount();
     int currentPlayer = getCurrentPlayer();
 
-    // 顶部对象图标与数量显示
+    // Top object icons and counts
     for (int i = 0; i < 8; ++i) {
         render_icon(renderer, icons[i], marginLeft + i * 60, marginTop, 32);
         char countStr[4];
@@ -544,53 +545,53 @@ void draw_game_board(SDL_Renderer* renderer, TTF_Font* font) {
         render_text(renderer, font, countStr, marginLeft + i * 60 + 10, marginTop + 35, black);
     }
 
-    // 在左上角显示当前玩家名称
+    // Show current player name in top-left corner
     SDL_Color blue = {0, 0, 255};
     char currentUserText[64];
     snprintf(currentUserText, sizeof(currentUserText), "Player: %s", getUsername());
     render_text(renderer, font, currentUserText, 20, 20, blue);
 
-    // 玩家对象矩阵
+    // Player object matrix
     int startY = marginTop + 70;
     for (int p = 0; p < playerCount; ++p) {
-        // 根据玩家状态设置颜色
+        // Set color based on player state
         SDL_Color color = black;
         if (!isPlayerAlive(p)) color = gray;
         else if (p == currentPlayer) color = red;
 
-        // 绘制玩家名称
+        // Draw player name
         render_text(renderer, font, getPlayerName(p), marginLeft - 80, startY + p * 40 + 5, color);
 
-        // 绘制玩家对象矩阵
+        // Draw player object matrix
         for (int o = 0; o < 8; ++o) {
             SDL_Rect rect = {marginLeft + o * 60, startY + p * 40, cellSize, cellSize};
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
             SDL_RenderDrawRect(renderer, &rect);
 
-            // 显示对象值
+            // Show object value
             char val[2];
             snprintf(val, sizeof(val), "%d", getTableValue(p, o));
             render_text(renderer, font, val, rect.x + 12, rect.y + 8, black);
         }
     }
 
-    // 右侧显示玩家的卡牌
+    // Show player's cards on the right
     render_cards(renderer, cards, getMyCards(), 3);
  
-    // OSG操作按钮
+    // OSG action buttons
     render_osg_buttons(renderer, font);
  
-    // 底部显示
+    // Bottom display
     char currentUserid[30];
     snprintf(currentUserid, sizeof(currentUserid), "Current ID: %s", getLastResult());
     render_text(renderer, font, currentUserid, WINDOW_WIDTH / 2 - 200, WINDOW_HEIGHT - 60, red);
-    // 在底部显示当前玩家姓名
+    // Show current player name at bottom
     if (getIsGameStarted()) {
-        SDL_Color turnColor = {255, 0, 0}; // 红色高亮当前玩家
+        SDL_Color turnColor = {255, 0, 0}; // Highlight current player in red
         int currentPlayerId = -1;
         currentPlayerId = getCurrentTurnPlayer();
 
-        // 显示带玩家名的回合信息
+        // Show turn information with player name
         char turnText[128];
         if (currentPlayerId >= 0) {
             snprintf(turnText, sizeof(turnText), "Current Player: %s", getPlayerName(currentPlayerId));
@@ -599,20 +600,20 @@ void draw_game_board(SDL_Renderer* renderer, TTF_Font* font) {
         }
         render_text(renderer, font, turnText, WINDOW_WIDTH / 2 - 200, WINDOW_HEIGHT - 90, turnColor);
     }
-    // 在底部显示LOGO
+    // Show logo at bottom
     render_text(renderer, font, "SHERLOCK 13", WINDOW_WIDTH / 2 - 100, WINDOW_HEIGHT - 30, black);
 }
  
 /**
- * @brief 绘制角色信息表
+ * @brief Draw character information table
  * 
- * @param renderer SDL渲染器
- * @param font 字体对象
+ * @param renderer SDL renderer
+ * @param font Font object
  */
 void draw_role_table(SDL_Renderer* renderer, TTF_Font* font) {
     SDL_Color black = {0, 0, 0};
      
-    // 角色名称数组
+    // Character name array
     const char* roleNames[13] = {
         "Sebastian Moran", "Irene Adler", "Inspector Lestrade", "Inspector Gregson",
         "Inspector Baynes", "Inspector Bradstreet", "Inspector Hopkins",
@@ -620,7 +621,7 @@ void draw_role_table(SDL_Renderer* renderer, TTF_Font* font) {
         "Mary Morstan", "James Moriarty"
     };
      
-    // 角色对象矩阵
+    // Character object matrix
     int roleObjects[13][8] = {
         {0,0,0,1,0,0,0,1}, {1,0,0,0,1,0,0,0}, {0,1,0,0,1,0,1,0},
         {0,1,1,0,0,0,1,0}, {0,0,1,1,0,0,0,1}, {1,0,0,0,0,1,1,0},
@@ -629,13 +630,13 @@ void draw_role_table(SDL_Renderer* renderer, TTF_Font* font) {
         {0,0,0,1,1,0,1,0}
     };
  
-    // 绘制角色表格
+    // Draw character table
     int startX = 20, startY = 400;
     for (int i = 0; i < 13; ++i) {
-        // 绘制角色名称(分两列显示)
+        // Draw character name (display in two columns)
         render_text(renderer, font, roleNames[i], startX + ((i < 7) ? 0 : 450), startY + (i % 7) * 35, black);
          
-        // 绘制角色拥有的对象图标
+        // Draw objects owned by character
         for (int j = 0; j < 8; ++j) {
             if (roleObjects[i][j]) {
                 int x = startX + ((i < 7) ? 200 : 630) + j * 26;
@@ -645,12 +646,12 @@ void draw_role_table(SDL_Renderer* renderer, TTF_Font* font) {
     }
 }
 
- // 按钮渲染函数
+ // Button rendering function
 void render_osg_buttons(SDL_Renderer* renderer, TTF_Font* font) {
     const char *labels[3] = {"Observe (O)", "Speculate (S)", "Guess (G)"};
     SDL_Color black = {0, 0, 0, 255};
 
-    // O按钮
+    // O button
     SDL_Rect btnO = {BUTTON_O_X, BUTTON_O_Y, BUTTON_WIDTH, BUTTON_HEIGHT};
     SDL_SetRenderDrawColor(renderer, hoverO ? 255 : 200, hoverO ? 220 : 200, hoverO ? 0 : 200, 255);
     SDL_RenderFillRect(renderer, &btnO);
@@ -658,7 +659,7 @@ void render_osg_buttons(SDL_Renderer* renderer, TTF_Font* font) {
     SDL_RenderDrawRect(renderer, &btnO);
     render_text(renderer, font, labels[0], btnO.x + 13, btnO.y + 10, black);
 
-    // S按钮 
+    // S button 
     SDL_Rect btnS = {BUTTON_S_X, BUTTON_S_Y, BUTTON_WIDTH, BUTTON_HEIGHT};
     SDL_SetRenderDrawColor(renderer, hoverS ? 0 : 200, hoverS ? 220 : 200, hoverS ? 255 : 200, 255);
     SDL_RenderFillRect(renderer, &btnS);
@@ -666,7 +667,7 @@ void render_osg_buttons(SDL_Renderer* renderer, TTF_Font* font) {
     SDL_RenderDrawRect(renderer, &btnS);
     render_text(renderer, font, labels[1], btnS.x + 9, btnS.y + 10, black);
 
-    // G按钮
+    // G button
     SDL_Rect btnG = {BUTTON_G_X, BUTTON_G_Y, BUTTON_WIDTH, BUTTON_HEIGHT};
     SDL_SetRenderDrawColor(renderer, hoverG ? 255 : 200, hoverG ? 0 : 200, hoverG ? 0 : 200, 255);
     SDL_RenderFillRect(renderer, &btnG);
