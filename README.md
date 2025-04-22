@@ -104,3 +104,4 @@ Chaque joueur doit lancer un client. Plusieurs options sont possibles :
 > 📘 Voir le fichier PDF fourni pour les règles détaillées
 
 ---
+![Interface du jeu](./Captures%20d’écran/Interface.png)
