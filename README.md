@@ -33,8 +33,8 @@ cd Sherlock13
 - **Méthode 2 : télécharger l'archive zip et la décompresser**
 
 ```bash
-unzip Sherlock13.zip
-cd Sherlock13
+unzip Sherlock13-main.zip
+cd Sherlock13-main
 ```
 
 ### 3. Compiler le projet
