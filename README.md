@@ -24,7 +24,7 @@ sudo apt install build-essential libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev l
 - **Méthode 1 : utiliser git clone**
 
 ```bash
-git clone https://github.com/your-username/Sherlock13.git
+git clone https://github.com/5b25/Sherlock13.git
 cd Sherlock13
 ```
 
