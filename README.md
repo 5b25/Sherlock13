@@ -33,8 +33,8 @@ cd Sherlock13
 - **Méthode 2 : télécharger l'archive zip et la décompresser**
 
 ```bash
-unzip Sherlock13_Final_Fixed_Server.zip
-cd Sherlock13_Final_Fixed_Server
+unzip Sherlock13.zip
+cd Sherlock13
 ```
 
 ### 3. Compiler le projet
