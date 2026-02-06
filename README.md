@@ -2,7 +2,18 @@
 
 Ce projet est une version multijoueur en ligne du jeu **Sherlock13**, avec une interface graphique développée en SDL2, SDL_ttf et SDL_image.
 
-> 🌐 Prend en charge **jusqu'à 4 joueurs connectés simultanément** sur un réseau local, chaque joueur utilisant un client distinct pour participer au jeu.
+> Prend en charge **jusqu'à 4 joueurs connectés simultanément** sur un réseau local, chaque joueur utilisant un client distinct pour participer au jeu.
+
+---
+
+## 🚧 État actuel et Roadmap (Refonte v2.0)
+
+> **Note :** Le code actuellement présent sur la branche `main` correspond à la **version stable v1.0**. Je travaille actuellement en local sur une refonte architecturale majeure pour aligner le projet avec les standards industriels (tel que mentionné dans mon CV).
+
+**Fonctionnalités de la v2.0 (En cours de développement) :**
+* **Protocole Réseau :** Migration d'un protocole basé sur du texte vers un protocole **binaire TLV (Type-Length-Value)** afin de résoudre les problèmes de fragmentation et d'assemblage des paquets TCP (*TCP sticking/half-packet*).
+* **Modèle de Concurrence :** Évolution du modèle « Thread-per-Client » vers un modèle de **Pool de Threads (Thread Pool)** avec file d'attente de tâches, pour améliorer la gestion des ressources sous forte charge.
+* **Sûreté des Threads (Thread Safety) :** Implémentation de verrous Mutex stricts pour protéger l'état global du serveur et éliminer les conditions de concurrence (*race conditions*).
 
 ---
 
@@ -10,7 +21,7 @@ Ce projet est une version multijoueur en ligne du jeu **Sherlock13**, avec une i
 
 Ce projet utilise des bibliothèques BSD étendues et des bibliothèques de threads réseau POSIX, donc **il est uniquement compatible avec les systèmes Linux** (comme Ubuntu).
 
-> ✅ Environnement de test : **Ubuntu 22.04 LTS**
+> Environnement de test : **Ubuntu 22.04 LTS**
 
 ### 1. Installer les dépendances (exemple pour Ubuntu)
 
@@ -51,7 +62,7 @@ make
 
 ## 🚀 2. Méthodes de lancement
 
-### ✅ Lancer le serveur (`serveur`)
+### Lancer le serveur (`serveur`)
 
 Il faut lancer le serveur en premier. Deux méthodes sont possibles :
 
@@ -62,7 +73,7 @@ Il faut lancer le serveur en premier. Deux méthodes sont possibles :
 
 ---
 
-### ✅ Lancer un client (`client`)
+### Lancer un client (`client`)
 
 Chaque joueur doit lancer un client. Plusieurs options sont possibles :
 
@@ -101,7 +112,7 @@ Chaque joueur doit lancer un client. Plusieurs options sont possibles :
 - Trois types d'actions par tour : O / S / G
 - Devinez juste pour gagner, une erreur mène à l'élimination
 
-> 📘 Voir le fichier PDF fourni pour les règles détaillées
+> Voir le fichier PDF fourni pour les règles détaillées
 
 ---
 ![Interface du jeu](./Captures%20d’écran/Interface.png)
