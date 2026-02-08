@@ -270,15 +270,13 @@ void draw_selection_popup(SDL_Renderer* renderer, TTF_Font* font) {
  * @param cible Target ID (only needed for S action)
  */
 void send_action_request(char type, int objet, int cible) {
-    char buffer[64];
     if (type == 'O') {
-        snprintf(buffer, sizeof(buffer), "O %d", objet); // Format: O obj
+        sendActionO(objet);// Format: O obj
     } else if (type == 'S') {
-        snprintf(buffer, sizeof(buffer), "S %d %d %d", myClientId, cible, objet); // Format: S myClientId target_id obj
+        sendActionS(cible, objet); // Format: S myClientId target_id obj
     } else if (type == 'G') {
-        snprintf(buffer, sizeof(buffer), "G %d %d", myClientId, objet); // Format: G myClientId card
+        sendActionG(objet); // Format: G myClientId card
     }
-    sendMessageToServer("", 0, buffer);
 }
  
 /**
@@ -296,7 +294,13 @@ void run_gui() {
     SDL_Window *window = SDL_CreateWindow("Sherlock13", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         WINDOW_WIDTH, WINDOW_HEIGHT, 0);
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+
+    // Ensure the font file exists. If not, the program will exit with an error message.
     TTF_Font *font = TTF_OpenFont("img/sans.ttf", 20);
+    if (!font) {
+        printf("Font error: %s\n", TTF_GetError());
+        return;
+    }
  
     SDL_Color black = {0, 0, 0};
      
@@ -346,12 +350,8 @@ void run_gui() {
                 // Handle username input when game not started
                 if (!getIsGameStarted() && x >= goButton.x && x <= goButton.x + goButton.w &&
                    y >= goButton.y && y <= goButton.y + goButton.h && inputText[0] != '\0' && !isUsernameSet()) {
-                   setUsername(inputText);
-                    if (getClientPort() == 0) {
-                        char msg[128];
-                        snprintf(msg, sizeof(msg), "C %s", getUsername());
-                        sendMessageToServer("", 0, msg);
-                    }
+                    setUsername(inputText);
+                    sendConnect(getUsername(), getClientPort());
                 }
  
                 // Handle action buttons when game is in progress and it's current player's turn

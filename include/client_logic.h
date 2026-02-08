@@ -32,6 +32,13 @@ int isPlayerAlive(int playerId);
 int getCurrentPlayer();
 void updateCurrentTurn(int id);
 int getCurrentTurnPlayer();
+int getIsConnected();
+int getMyClientId();
+
+void sendConnect(const char* name, int port);
+void sendActionO(int objId);
+void sendActionS(int targetId, int objId);
+void sendActionG(int cardId);
 
 #endif
 

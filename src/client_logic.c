@@ -1,6 +1,7 @@
 // client_logic.c
 #include "../include/client_logic.h"
 #include "../include/gui.h"
+#include "../include/common.h" // Includes Protocol definitions
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,7 +12,9 @@
 #include <pthread.h>
 #include <netdb.h>
 
-#define MAX_MSG 512
+// External helper from common.c
+extern void send_packet(int sockfd, uint8_t type, const void *payload, uint32_t payload_len);
+extern int recv_all(int sockfd, void *buffer, size_t length);
 
 pthread_mutex_t gameStateMutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t playerDataMutex = PTHREAD_MUTEX_INITIALIZER;
@@ -34,13 +37,13 @@ int playerCount = 0;
 char serverIP[256] = "127.0.0.1";
 
 int socketClient = -1;
+int myClientId = -1;
 char username[32] = "";
 char lastResult[128] = "";
-int myCards[3];
-int objectCounts[8];
-int gameState = 0;
+int myCards[3]= {-1, -1, -1};;
+int objectCounts[8]= {0};
+int gameState = 0;  // 0 = Waiting, 1 = Started, 2 = Ended
 int isMyTurn = 0;
-int myClientId = -1;
 int gClientPort = 0;
 static int currentTurnPlayerId = -1;
 
@@ -104,125 +107,93 @@ void sendMessageToServer(char *ip, int port, char *mess) {
     send(socketClient, mess, strlen(mess), 0);
 }
 
+// New Binary Action Senders
+void sendConnect(const char* name, int port) {
+    Payload_Connect pkg;
+    strncpy(pkg.name, name, 39);
+    pkg.port = port;
+    getLocalIP(pkg.ip, 40);
+    send_packet(socketClient, MSG_CONNECT, &pkg, sizeof(pkg));
+}
+
+void sendActionO(int objId) {
+    Payload_Action_O pkg = { .asking_player_id = myClientId, .object_id = objId };
+    send_packet(socketClient, MSG_ACTION_O, &pkg, sizeof(pkg));
+}
+
+void sendActionS(int targetId, int objId) {
+    Payload_Action_S pkg = { .asking_player_id = myClientId, .target_player_id = targetId, .object_id = objId };
+    send_packet(socketClient, MSG_ACTION_S, &pkg, sizeof(pkg));
+}
+
+void sendActionG(int cardId) {
+    Payload_Action_G pkg = { .asking_player_id = myClientId, .guessed_card_id = cardId };
+    send_packet(socketClient, MSG_ACTION_G, &pkg, sizeof(pkg));
+}
+
 void* listenToServer(void *arg) {
-    char buffer[MAX_MSG];
-
     while (1) {
-        memset(buffer, 0, MAX_MSG);
-        int r = recv(socketClient, buffer, MAX_MSG - 1, 0);
-        if (r <= 0) break;
-
-        buffer[r] = '\0';
-
-        if (strncmp(buffer, "U OK", 4) == 0) {
-            printf("Username accepted, waiting for other players...\n");
-        } else if (strncmp(buffer, "U ERR", 5) == 0) {
-            pthread_mutex_lock(&gameStateMutex);
-            strcpy(lastResult, "❌ The username is duplicated, please  rename it!");
-            pthread_mutex_unlock(&gameStateMutex);
-        } else if (buffer[0] == 'D') {
-            sscanf(buffer + 2, "%d %d %d %d %d %d %d %d %d %d %d",
-                &myCards[0], &myCards[1], &myCards[2],
-                &objectCounts[0], &objectCounts[1], &objectCounts[2], &objectCounts[3],
-                &objectCounts[4], &objectCounts[5], &objectCounts[6], &objectCounts[7]);
-            pthread_mutex_lock(&gameStateMutex);
-            gameState = GAME_STARTED;
-            pthread_mutex_unlock(&gameStateMutex);
-            printf("🎴 Card data received, game on!\n");
-
-            strncpy(lastResult, buffer + 2, sizeof(lastResult) - 1);
-            lastResult[sizeof(lastResult) - 1] = '\0';
-            printf("[Client] Message du serveur: %s\n", lastResult);
-        } else if (buffer[0] == 'E') {
-            pthread_mutex_lock(&gameStateMutex);
-            strncpy(lastResult, buffer + 2, sizeof(lastResult)-1);
-            lastResult[sizeof(lastResult)-1] = '\0';
-        
-            if (strstr(buffer, "WIN")) {
-                gameState = GAME_ENDED;
-                setShowEndDialog(1);
-            } else if (strstr(buffer, "LOSE")) {
-                int pid;
-                if (sscanf(buffer + 2, "%d", &pid) == 1 && pid >= 0 && pid < 4) {
-                    playerAlive[pid] = 0;
-                }
-            } else if (strstr(buffer, "DRAW")) {
-                gameState = GAME_ENDED;
-            }
-            pthread_mutex_unlock(&gameStateMutex);
-        } else if (buffer[0] == 'M') {
-            int current;
-            sscanf(buffer + 2, "%d", &current);
-            
-            pthread_mutex_lock(&gameStateMutex);
-            isMyTurn = (current == myClientId);
-            currentTurnPlayerId = current; 
-            pthread_mutex_unlock(&gameStateMutex);
-
-            strncpy(lastResult, buffer + 2, sizeof(lastResult) - 1);
-            lastResult[sizeof(lastResult) - 1] = '\0';
-            printf("[Client] Message du serveur: %s\n", lastResult);
-        } else if (buffer[0] == 'V') {
-
-            strncpy(lastResult, buffer + 2, sizeof(lastResult) - 1);
-            lastResult[sizeof(lastResult) - 1] = '\0';
-            printf("[Client] Message du serveur: %s\n", lastResult);
-
-            // Verification Result Type | Target Player | Symbol ID
-            int resultVal, targetPlayer, symbol;
-            if (sscanf(buffer + 2, "%d %d %d", &resultVal, &targetPlayer, &symbol) == 3) {
-                char msg[128];
-                const char *symbolName = nameobjets[symbol];
-                
-                if (targetPlayer == -1) {
-                    // Verification by all players (whether there is a sign)
-                    snprintf(msg, sizeof(msg), "All players %s Symbol : %s",
-                            resultVal ? "has" : "doesn't have", symbolName);
-                } else {
-                    // Single player verification (number of symbols)
-                    const char *targetName = getPlayerName(targetPlayer);
-                    snprintf(msg, sizeof(msg), "player %s has %d %s",
-                            targetName, resultVal, symbolName);
-                }
-                
-                // Update the final result (lock protection)
-                pthread_mutex_lock(&gameStateMutex);
-                strncpy(lastResult, msg, sizeof(lastResult)-1);
-                pthread_mutex_unlock(&gameStateMutex);
-                
-                printf("[debug] Verification result:%s\n", msg);
-            } else {
-                printf("[Error] Invalid V command format:%s\n", buffer);
-            }
-        } else if (buffer[0] == 'L') {
-            pthread_mutex_lock(&playerDataMutex);
-            playerCount = 0;
-            char *token = strtok(buffer + 2, " ");
-            while (token && playerCount < 4) {
-                strncpy(playerNames[playerCount], token, 31);
-                playerNames[playerCount][31] = '\0';
-                playerCount++;
-                token = strtok(NULL, " ");
-            }
-            pthread_mutex_unlock(&playerDataMutex);
-
-            pthread_mutex_lock(&gameStateMutex);
-            snprintf(lastResult, sizeof(lastResult), "🎮 List of currently joined players：%s", buffer + 2);
-            pthread_mutex_unlock(&gameStateMutex);
-
-        } else if (buffer[0] == 'I') { // Handling port allocation
-            sscanf(buffer + 2, "%d", &myClientId); // Parse only the client ID
-            printf("Assigned client ID: %d\n", myClientId);
-        } else if (buffer[0] == 'T') {
-            // Handling object matrix updates T <player> <object> <value>
-            int pid, oid, val;
-            if (sscanf(buffer + 2, "%d %d %d", &pid, &oid, &val) == 3) {
-                if (pid >= 0 && pid < 4 && oid >= 0 && oid < 8) {
-                    objectTable[pid][oid] = val;
-                }
-            }
-
+        PacketHeader header;
+        if (recv_all(socketClient, &header, sizeof(PacketHeader)) < 0) {
+            printf("Disconnected from server.\n");
+            break;
         }
+
+        uint32_t len = ntohl(header.length);
+        void *buffer = NULL;
+        if (len > 0) {
+            buffer = malloc(len);
+            recv_all(socketClient, buffer, len);
+        }
+
+        pthread_mutex_lock(&gameStateMutex);
+        switch (header.type) {
+            case MSG_ID_ASSIGN: {
+                Payload_ID_Assign *p = (Payload_ID_Assign*)buffer;
+                myClientId = p->playerId;
+                printf("[Client] Assigned ID: %d\n", myClientId);
+                break;
+            }
+            case MSG_DISTRIBUTE: {
+                Payload_Distribute *p = (Payload_Distribute*)buffer;
+                memcpy(myCards, p->Cards, sizeof(myCards));
+                // memcpy(objectCounts, p->objCounts, sizeof(objectCounts)); // If server sends counts
+                gameState = 1; // STARTED
+                snprintf(lastResult, 128, "Game Started!");
+                break;
+            }
+            case MSG_TURN: {
+                Payload_Turn *p = (Payload_Turn*)buffer;
+                isMyTurn = (p->player_id == myClientId);
+                updateCurrentTurn(p->player_id);
+                snprintf(lastResult, 128, "Player %d's Turn", p->player_id);
+                break;
+            }
+            case MSG_VERIFY: {
+                Payload_Verify *p = (Payload_Verify*)buffer;
+                if (p->target_player_id == -1) {
+                    snprintf(lastResult, 128, "Global Check: Object %s %s found", 
+                             nameobjets[p->object_id], p->result_val ? "IS" : "NOT");
+                } else {
+                    snprintf(lastResult, 128, "Player %d has %d of %s", 
+                             p->target_player_id, p->result_val, nameobjets[p->object_id]);
+                }
+                break;
+            }
+            case MSG_GAME_OVER: {
+                Payload_Game_Over *p = (Payload_Game_Over*)buffer;
+                if (p->is_winner) {
+                    snprintf(lastResult, 128, "Player %d WINS!", p->player_id);
+                    setShowEndDialog(1);
+                    gameState = 2;
+                } else {
+                    snprintf(lastResult, 128, "Player %d Eliminated.", p->player_id);
+                }
+                break;
+            }
+        }
+        pthread_mutex_unlock(&gameStateMutex);
+        if (buffer) free(buffer);
     }
     return NULL;
 }
@@ -324,4 +295,16 @@ int getCurrentTurnPlayer() {
     id = currentTurnPlayerId;
     pthread_mutex_unlock(&gameStateMutex);
     return id;
+}
+
+int getIsConnected() {
+    int connected;
+    pthread_mutex_lock(&gameStateMutex);
+    connected = (myClientId != -1); // If the ID is not -1, it means the connection is established.
+    pthread_mutex_unlock(&gameStateMutex);
+    return connected;
+}
+
+int getMyClientId() {
+    return myClientId;
 }
