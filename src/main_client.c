@@ -17,12 +17,8 @@ int main(int argc, char *argv[]) {
         setUsername(argv[4]);
 
         connectToServer(serverIP, serverPort);
-
-        char ip[40];
-        getLocalIP(ip, sizeof(ip));
-        char msg[256];
-        snprintf(msg, sizeof(msg), "C %s %d %s", ip, gClientPort, getUsername());
-        sendMessageToServer("", 0, msg);
+        // Send Connect message using binary protocol
+        sendConnect(getUsername(), gClientPort);
     }
 
     // Mode 2:./client <serverIP> <serverPort> <username>
@@ -33,6 +29,8 @@ int main(int argc, char *argv[]) {
         setUsername(argv[3]);
 
         connectToServer(serverIP, serverPort);
+        // Send Connect message using binary protocol
+        sendConnect(getUsername(), gClientPort);
     }
 
     // Mode 3:./client <clientPort> <username>
@@ -41,12 +39,8 @@ int main(int argc, char *argv[]) {
         setUsername(argv[2]);
 
         connectToServer(serverIP, serverPort);
-
-        char ip[40];
-        getLocalIP(ip, sizeof(ip));
-        char msg[256];
-        snprintf(msg, sizeof(msg), "C %s %d %s", ip, gClientPort, getUsername());
-        sendMessageToServer("", 0, msg);
+        // Send Connect message using binary protocol
+        sendConnect(getUsername(), gClientPort);
     }
 
     // Mode 4:./client <username>
@@ -55,15 +49,15 @@ int main(int argc, char *argv[]) {
         setUsername(argv[1]);
 
         connectToServer(serverIP, serverPort);
-        
-        char msg[128];
-        snprintf(msg, sizeof(msg), "C %s", getUsername());
-        sendMessageToServer("", 0, msg);
+        // Send Connect message using binary protocol
+        sendConnect(getUsername(), gClientPort);
     }
 
     // Mode 5: No parameters → GUI input
     else {
-        connectToServer(serverIP, serverPort);
+        // When started without parameters, no connection is established by this program
+        // The connection is triggered fully by the button in the GUI.
+        // connectToServer(serverIP, serverPort);
     }
 
     run_gui();

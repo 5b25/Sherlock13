@@ -338,13 +338,14 @@ void handle_logic(int clientSock, uint8_t type, void *data, uint32_t len) {
             }
             
             // 1. Register new client
-            clientSockets[nbClients] = clientSock;
-            strncpy(tcpClients[nbClients].name, pkg->name, 32);
-            tcpClients[nbClients].port = pkg->port;
-            strcpy(tcpClients[nbClients].ipAddress, pkg->ip);
+            int newID = nbClients;
+            clientSockets[newID] = clientSock;
+            strncpy(tcpClients[newID].name, pkg->name, 32);
+            tcpClients[newID].port = pkg->port;
+            strcpy(tcpClients[newID].ipAddress, pkg->ip);
             
             // 2. End ID Assignment
-            Payload_ID_Assign idPkg = { .playerId = nbClients, .port = 0 };
+            Payload_ID_Assign idPkg = { .playerId = newID, .port = 0 };
             send_packet(clientSock, MSG_ID_ASSIGN, &idPkg, sizeof(idPkg));
             
             // 3. Broadcast Player List
@@ -359,8 +360,8 @@ void handle_logic(int clientSock, uint8_t type, void *data, uint32_t len) {
 
             // 4. Broadcast the new player to all clients (including self)
             Payload_Player_List newPlayerPkg;
-            newPlayerPkg.id = nbClients;
-            strncpy(newPlayerPkg.name, tcpClients[nbClients].name, 32);
+            newPlayerPkg.id = newID;
+            strncpy(newPlayerPkg.name, tcpClients[newID].name, 32);
             broadcast_packet(MSG_PLAYER_LIST, &newPlayerPkg, sizeof(newPlayerPkg));
 
             // 5. Check if game should start
