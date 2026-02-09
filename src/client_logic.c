@@ -141,11 +141,14 @@ void* listenToServer(void *arg) {
 
         uint32_t len = ntohl(header.length);
         void *buffer = NULL;
+        
+        // Receive Payload (if exists)
         if (len > 0) {
             buffer = malloc(len);
             recv_all(socketClient, buffer, len);
         }
 
+        // Lock State for processing
         pthread_mutex_lock(&gameStateMutex);
         switch (header.type) {
             case MSG_ID_ASSIGN: {
@@ -154,18 +157,39 @@ void* listenToServer(void *arg) {
                 printf("[Client] Assigned ID: %d\n", myClientId);
                 break;
             }
+            case MSG_PLAYER_LIST: {
+                Payload_Player_List *p = (Payload_Player_List*)buffer;
+                pthread_mutex_lock(&playerDataMutex);
+                if (p->id >= 0 && p->id < 4) {
+                    strncpy(playerNames[p->id], p->name, 32);
+                    // Update player count based on the highest ID received + 1
+                    if (p->id >= playerCount) {
+                        playerCount = p->id + 1;
+                    }
+                }
+                pthread_mutex_unlock(&playerDataMutex);
+                if (p->id == myClientId) {
+                    printf("[Client] Lobby Update: Player %d is %s\n", p->id, p->name);
+                }
+                break;
+            }
             case MSG_DISTRIBUTE: {
                 Payload_Distribute *p = (Payload_Distribute*)buffer;
                 memcpy(myCards, p->Cards, sizeof(myCards));
                 // memcpy(objectCounts, p->objCounts, sizeof(objectCounts)); // If server sends counts
-                gameState = 1; // STARTED
+                gameState = GAME_STARTED; // STARTED
                 snprintf(lastResult, 128, "Game Started!");
+
+                pthread_mutex_lock(&playerDataMutex);
+                playerCount = 4; 
+                pthread_mutex_unlock(&playerDataMutex);
                 break;
             }
             case MSG_TURN: {
                 Payload_Turn *p = (Payload_Turn*)buffer;
                 isMyTurn = (p->player_id == myClientId);
-                updateCurrentTurn(p->player_id);
+
+                currentTurnPlayerId = p->player_id;
                 snprintf(lastResult, 128, "Player %d's Turn", p->player_id);
                 break;
             }
@@ -185,7 +209,7 @@ void* listenToServer(void *arg) {
                 if (p->is_winner) {
                     snprintf(lastResult, 128, "Player %d WINS!", p->player_id);
                     setShowEndDialog(1);
-                    gameState = 2;
+                    gameState = GAME_ENDED;
                 } else {
                     snprintf(lastResult, 128, "Player %d Eliminated.", p->player_id);
                 }
@@ -194,6 +218,8 @@ void* listenToServer(void *arg) {
         }
         pthread_mutex_unlock(&gameStateMutex);
         if (buffer) free(buffer);
+
+        usleep(1000);
     }
     return NULL;
 }
@@ -228,7 +254,7 @@ void connectToServer(const char *ip, int port) {
 }
 
 int getIsGameEnded() {
-    return gameState == 3;
+    return gameState == GAME_ENDED;
 }
 
 const char* getPlayerName(int index) {

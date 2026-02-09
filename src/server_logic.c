@@ -309,24 +309,63 @@ void handle_logic(int clientSock, uint8_t type, void *data, uint32_t len) {
 
     switch (type) {
         case MSG_CONNECT: {
-            if (nbClients >= MAX_CLIENTS) break;
-            Payload_Connect *pkg = (Payload_Connect*)data;
+            // 0. Validate Connection
+            // Ignore if the room is full
+            if (nbClients >= MAX_CLIENTS) {
+                printf("[Server] Connection rejected: Server full.\n");
+                break; 
+            }
             
+            // Prevent repeated logins to the same Socket
+            int isAlreadyRegistered = 0;
+            for (int i = 0; i < nbClients; i++) {
+                if (clientSockets[i] == clientSock) {
+                    isAlreadyRegistered = 1;
+                    break;
+                }
+            }
+            if (isAlreadyRegistered) {
+                printf("[Server] Ignored duplicate MSG_CONNECT from Socket %d\n", clientSock);
+                break; // End without assigning a new ID
+            }
+
+            Payload_Connect *pkg = (Payload_Connect*)data;
+
+            // Filter invalid requests with empty names
+            if (strlen(pkg->name) == 0) {
+                 printf("[Server] Ignored connection with empty name.\n");
+                 break;
+            }
+            
+            // 1. Register new client
             clientSockets[nbClients] = clientSock;
-            strncpy(tcpClients[nbClients].name, pkg->name, 40);
+            strncpy(tcpClients[nbClients].name, pkg->name, 32);
             tcpClients[nbClients].port = pkg->port;
             strcpy(tcpClients[nbClients].ipAddress, pkg->ip);
             
-            // Send ID Assignment
+            // 2. End ID Assignment
             Payload_ID_Assign idPkg = { .playerId = nbClients, .port = 0 };
             send_packet(clientSock, MSG_ID_ASSIGN, &idPkg, sizeof(idPkg));
             
+            // 3. Broadcast Player List
+            for (int i = 0; i < nbClients; i++) {
+                Payload_Player_List listPkg;
+                listPkg.id = i;
+                strncpy(listPkg.name, tcpClients[i].name, 32);
+                send_packet(clientSock, MSG_PLAYER_LIST, &listPkg, sizeof(listPkg));
+            }
+
             nbClients++;
-            
-            // Broadcast Player List (Simplified logic)
-            // Ideally, construct a payload with all names.
-            // For now, trigger game start if full
+
+            // 4. Broadcast the new player to all clients (including self)
+            Payload_Player_List newPlayerPkg;
+            newPlayerPkg.id = nbClients;
+            strncpy(newPlayerPkg.name, tcpClients[nbClients].name, 32);
+            broadcast_packet(MSG_PLAYER_LIST, &newPlayerPkg, sizeof(newPlayerPkg));
+
+            // 5. Check if game should start
             if (nbClients == nbPlayers && !gameStarted) {
+                printf("[Server] 4 Players connected. Starting game...\n");
                 gameStarted = 1;
                 melangerDeck();
                 createTable();
@@ -339,20 +378,16 @@ void handle_logic(int clientSock, uint8_t type, void *data, uint32_t len) {
                     distPkg.Cards[1] = deck[i*3+1];
                     distPkg.Cards[2] = deck[i*3+2];
                     
-                    // Calc initial visible objects (simplified logic from before)
+                    // Calc initial visible objects 
                     int c1=distPkg.Cards[0], c2=distPkg.Cards[1], c3=distPkg.Cards[2];
                     for(int j=0; j<8; j++) {
-                        // Assumption: tableCartes logic is pre-calculated correctly in createTable
-                        // Using a dummy sum logic here based on old code
-                         distPkg.objCounts[j] = tableCartes[c1][j] + tableCartes[c2][j] + tableCartes[c3][j]; 
-                         // Note: The logic in createTable needs to map correctly. 
-                         // For this refactor, I assume tableCartes is the global Truth.
-                         distPkg.objCounts[j] = 0; // Reset for security, client sees only their own or derived
+                        distPkg.objCounts[j] = tableCartes[c1][j] + tableCartes[c2][j] + tableCartes[c3][j]; 
+                        // distPkg.objCounts[j] = 0;
                     }
                     send_packet(clientSockets[i], MSG_DISTRIBUTE, &distPkg, sizeof(distPkg));
                 }
                 
-                // Broadcast Turns
+                // Broadcast First Turn
                 Payload_Turn turnPkg = { .player_id = 0 };
                 broadcast_packet(MSG_TURN, &turnPkg, sizeof(turnPkg));
             }

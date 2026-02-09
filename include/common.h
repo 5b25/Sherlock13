@@ -56,6 +56,13 @@ typedef struct {
 	int32_t port;     // Server's port number for the game
 } __attribute__((packed)) Payload_ID_Assign;
 
+
+// Payload for MSG_PLAYER_LIST (Server to Client)
+typedef struct {
+    int32_t id;
+    char name[32];
+} __attribute__((packed)) Payload_Player_List;
+
 // Payload for MSG_DISTRIBUTE (Server to Client)
 typedef struct {
 	int32_t Cards[3]; 		// The 3 cards assigned to the player (encoded as integers)

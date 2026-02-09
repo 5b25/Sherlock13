@@ -8,7 +8,7 @@ Ce projet est une version multijoueur en ligne du jeu **Sherlock13**, avec une i
 
 ## 🚧 État actuel et Roadmap (Refonte v2.0)
 
-> **Note :** Le code actuellement présent sur la branche `main` correspond à la **version stable v1.0**. Je travaille actuellement en local sur une refonte architecturale majeure pour aligner le projet avec les standards industriels (tel que mentionné dans mon CV).
+> **Note :** Le code actuellement présent sur la branche `main` correspond à la **version stable v2.0**.
 
 **Fonctionnalités de la v2.0 (En cours de développement) :**
 * **Protocole Réseau :** Migration d'un protocole basé sur du texte vers un protocole **binaire TLV (Type-Length-Value)** afin de résoudre les problèmes de fragmentation et d'assemblage des paquets TCP (*TCP sticking/half-packet*).
